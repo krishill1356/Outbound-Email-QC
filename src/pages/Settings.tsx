@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -39,12 +39,24 @@ import { useToast } from '@/hooks/use-toast';
 import { motion } from 'framer-motion';
 import Logo from '@/components/common/Logo';
 import { CRITERIA } from '@/lib/mock-data';
+import { getZammadSettings, saveZammadSettings, testConnection } from '@/services/zammadService';
 
 const Settings = () => {
   const { toast } = useToast();
   const [apiKey, setApiKey] = useState('');
   const [zammadUrl, setZammadUrl] = useState('');
   const [isConfigured, setIsConfigured] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  
+  // Load saved settings on component mount
+  useEffect(() => {
+    const settings = getZammadSettings();
+    if (settings) {
+      setZammadUrl(settings.apiUrl || '');
+      setApiKey(settings.apiToken || '');
+      setIsConfigured(!!settings.apiUrl && !!settings.apiToken);
+    }
+  }, []);
   
   const handleSaveConnection = () => {
     if (!zammadUrl || !apiKey) {
@@ -56,7 +68,12 @@ const Settings = () => {
       return;
     }
     
-    // This would actually save the connection settings in a real app
+    // Save the connection settings
+    saveZammadSettings({
+      apiUrl: zammadUrl,
+      apiToken: apiKey
+    });
+    
     setIsConfigured(true);
     toast({
       title: "Settings updated",
@@ -64,7 +81,7 @@ const Settings = () => {
     });
   };
   
-  const handleTestConnection = () => {
+  const handleTestConnection = async () => {
     if (!zammadUrl || !apiKey) {
       toast({
         title: "Validation Error",
@@ -74,11 +91,36 @@ const Settings = () => {
       return;
     }
     
-    // This would actually test the connection in a real app
-    toast({
-      title: "Connection successful",
-      description: "Successfully connected to Zammad API."
-    });
+    setIsTesting(true);
+    
+    try {
+      const isConnected = await testConnection({
+        apiUrl: zammadUrl,
+        apiToken: apiKey
+      });
+      
+      if (isConnected) {
+        toast({
+          title: "Connection successful",
+          description: "Successfully connected to Zammad API."
+        });
+      } else {
+        toast({
+          title: "Connection failed",
+          description: "Could not connect to Zammad API. Please check your URL and API key.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error testing connection:', error);
+      toast({
+        title: "Connection error",
+        description: "An error occurred while testing the connection.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTesting(false);
+    }
   };
   
   return (
@@ -195,9 +237,18 @@ const Settings = () => {
               </div>
             </CardContent>
             <CardFooter className="flex justify-between">
-              <Button variant="outline" onClick={handleTestConnection}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Test Connection
+              <Button variant="outline" onClick={handleTestConnection} disabled={isTesting}>
+                {isTesting ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Testing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Test Connection
+                  </>
+                )}
               </Button>
               <Button onClick={handleSaveConnection}>
                 <Save className="h-4 w-4 mr-2" />
