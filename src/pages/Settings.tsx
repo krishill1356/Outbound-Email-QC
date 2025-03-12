@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { 
   Card, 
@@ -19,9 +18,6 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { 
-  Textarea 
-} from '@/components/ui/textarea';
-import { 
   Select, 
   SelectContent, 
   SelectItem, 
@@ -35,18 +31,33 @@ import {
   Plug, 
   Settings as SettingsIcon,
   Save,
-  RefreshCw
+  RefreshCw,
+  Mail,
+  Database
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { motion } from 'framer-motion';
+import Logo from '@/components/common/Logo';
+import { CRITERIA } from '@/lib/mock-data';
 
 const Settings = () => {
   const { toast } = useToast();
   const [apiKey, setApiKey] = useState('');
   const [zammadUrl, setZammadUrl] = useState('');
+  const [isConfigured, setIsConfigured] = useState(false);
   
   const handleSaveConnection = () => {
-    // Here you would actually save the connection settings
+    if (!zammadUrl || !apiKey) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide both Zammad URL and API Key",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // This would actually save the connection settings in a real app
+    setIsConfigured(true);
     toast({
       title: "Settings updated",
       description: "Your Zammad connection settings have been saved."
@@ -54,7 +65,16 @@ const Settings = () => {
   };
   
   const handleTestConnection = () => {
-    // Here you would actually test the connection
+    if (!zammadUrl || !apiKey) {
+      toast({
+        title: "Validation Error",
+        description: "Please provide both Zammad URL and API Key",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // This would actually test the connection in a real app
     toast({
       title: "Connection successful",
       description: "Successfully connected to Zammad API."
@@ -66,21 +86,31 @@ const Settings = () => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
+      className="max-w-5xl mx-auto"
     >
       <section className="mb-8">
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground mt-1">Configure your Email QC application</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Settings</h1>
+            <p className="text-muted-foreground mt-1">Configure your Email QC application</p>
+          </div>
+          <Logo size="medium" />
+        </div>
       </section>
       
-      <Tabs defaultValue="integrations" className="space-y-4">
+      <Tabs defaultValue="zammad" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="zammad">
+            <Mail className="h-4 w-4 mr-2" />
+            Zammad Integration
+          </TabsTrigger>
+          <TabsTrigger value="qc-settings">
+            <Database className="h-4 w-4 mr-2" />
+            QC Settings
+          </TabsTrigger>
           <TabsTrigger value="profile">
             <User className="h-4 w-4 mr-2" />
             User Profile
-          </TabsTrigger>
-          <TabsTrigger value="integrations">
-            <Plug className="h-4 w-4 mr-2" />
-            Integrations
           </TabsTrigger>
           <TabsTrigger value="notifications">
             <Bell className="h-4 w-4 mr-2" />
@@ -95,6 +125,173 @@ const Settings = () => {
             General
           </TabsTrigger>
         </TabsList>
+        
+        <TabsContent value="zammad" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Zammad Integration</CardTitle>
+              <CardDescription>
+                Configure your connection to Zammad for email quality assessment
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="zammad-url">Zammad URL</Label>
+                <Input 
+                  id="zammad-url" 
+                  placeholder="https://your-zammad-instance.com" 
+                  value={zammadUrl}
+                  onChange={(e) => setZammadUrl(e.target.value)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  The URL of your Zammad instance (e.g., https://support.example.com)
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="api-key">API Key</Label>
+                <Input 
+                  id="api-key" 
+                  type="password" 
+                  placeholder="Your Zammad API key" 
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Generate an API key in your Zammad admin settings
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="sync-frequency">Data Sync Frequency</Label>
+                <Select defaultValue="daily">
+                  <SelectTrigger id="sync-frequency">
+                    <SelectValue placeholder="Select frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="realtime">Real-time</SelectItem>
+                    <SelectItem value="hourly">Hourly</SelectItem>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="manual">Manual Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center space-x-2">
+                  <Switch id="auto-sync" defaultChecked />
+                  <Label htmlFor="auto-sync">Enable automatic sync</Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch id="fetch-closed" />
+                  <Label htmlFor="fetch-closed">Include closed tickets</Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Switch id="fetch-internal" />
+                  <Label htmlFor="fetch-internal">Include internal notes</Label>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" onClick={handleTestConnection}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Test Connection
+              </Button>
+              <Button onClick={handleSaveConnection}>
+                <Save className="h-4 w-4 mr-2" />
+                Save Connection
+              </Button>
+            </CardFooter>
+          </Card>
+          
+          {isConfigured && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Data Import</CardTitle>
+                <CardDescription>
+                  Import emails from Zammad for quality assessment
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="date-range">Date Range</Label>
+                  <Select defaultValue="last-week">
+                    <SelectTrigger id="date-range">
+                      <SelectValue placeholder="Select date range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="today">Today</SelectItem>
+                      <SelectItem value="yesterday">Yesterday</SelectItem>
+                      <SelectItem value="last-week">Last 7 days</SelectItem>
+                      <SelectItem value="last-month">Last 30 days</SelectItem>
+                      <SelectItem value="custom">Custom range</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="agent-filter">Filter by Agent</Label>
+                  <Select defaultValue="all">
+                    <SelectTrigger id="agent-filter">
+                      <SelectValue placeholder="Select agent" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Agents</SelectItem>
+                      {/* Agent options would be populated from Zammad API */}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button className="w-full">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Import Emails for QC
+                </Button>
+              </CardFooter>
+            </Card>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="qc-settings" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Quality Check Settings</CardTitle>
+              <CardDescription>
+                Configure quality check criteria and weights
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-4">
+                {CRITERIA.map((criteria) => (
+                  <div key={criteria.id} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor={`weight-${criteria.id}`}>{criteria.name}</Label>
+                      <span className="text-sm text-muted-foreground">{criteria.weight * 100}%</span>
+                    </div>
+                    <Input 
+                      id={`weight-${criteria.id}`}
+                      type="range" 
+                      min="0" 
+                      max="1" 
+                      step="0.05"
+                      defaultValue={criteria.weight.toString()}
+                      className="w-full"
+                    />
+                    <p className="text-sm text-muted-foreground">{criteria.description}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button>
+                <Save className="h-4 w-4 mr-2" />
+                Save QC Settings
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
         
         <TabsContent value="profile" className="space-y-4">
           <Card>
@@ -134,69 +331,6 @@ const Settings = () => {
               <Button>
                 <Save className="h-4 w-4 mr-2" />
                 Save Changes
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="integrations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Zammad Integration</CardTitle>
-              <CardDescription>
-                Configure your connection to Zammad for email quality assessment
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="zammad-url">Zammad URL</Label>
-                <Input 
-                  id="zammad-url" 
-                  placeholder="https://your-zammad-instance.com" 
-                  value={zammadUrl}
-                  onChange={(e) => setZammadUrl(e.target.value)}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="api-key">API Key</Label>
-                <Input 
-                  id="api-key" 
-                  type="password" 
-                  placeholder="Your Zammad API key" 
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="sync-frequency">Sync Frequency</Label>
-                <Select defaultValue="daily">
-                  <SelectTrigger id="sync-frequency">
-                    <SelectValue placeholder="Select frequency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="realtime">Real-time</SelectItem>
-                    <SelectItem value="hourly">Hourly</SelectItem>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="manual">Manual Only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="flex items-center space-x-2 pt-2">
-                <Switch id="auto-sync" defaultChecked />
-                <Label htmlFor="auto-sync">Enable automatic sync</Label>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button variant="outline" onClick={handleTestConnection}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Test Connection
-              </Button>
-              <Button onClick={handleSaveConnection}>
-                <Save className="h-4 w-4 mr-2" />
-                Save Connection
               </Button>
             </CardFooter>
           </Card>
