@@ -7,7 +7,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { 
   Search, 
-  Plus, 
   SlidersHorizontal, 
   ArrowUpDown,
   Mail,
@@ -15,7 +14,8 @@ import {
   CheckCircle,
   XCircle,
   MoreHorizontal,
-  BarChart
+  BarChart,
+  Trash
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -25,16 +25,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import AddAgentDialog from '@/components/agents/AddAgentDialog';
 import { AGENTS, getPerformanceData } from '@/lib/mock-data';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useToast } from '@/hooks/use-toast';
+import { Agent } from '@/types';
 
 const Agents = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [agents, setAgents] = useState<Agent[]>(AGENTS);
   const performanceData = getPerformanceData();
+  const { toast } = useToast();
   
   // Find agent performance data and merge with agent data
-  const agentsWithPerformance = AGENTS.map(agent => {
+  const agentsWithPerformance = agents.map(agent => {
     const performance = performanceData.agents.find(a => a.agent.id === agent.id);
     return {
       ...agent,
@@ -51,6 +56,24 @@ const Agents = () => {
     agent.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     agent.department.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleAddAgent = (newAgent: { name: string; email: string; department: string }) => {
+    const agentToAdd: Agent = {
+      id: `agent-${Date.now()}`,
+      ...newAgent,
+      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(newAgent.name)}`
+    };
+    
+    setAgents(prevAgents => [...prevAgents, agentToAdd]);
+  };
+
+  const handleRemoveAgent = (agentId: string) => {
+    setAgents(prevAgents => prevAgents.filter(agent => agent.id !== agentId));
+    toast({
+      title: "Agent Removed",
+      description: "The agent has been removed successfully",
+    });
+  };
   
   return (
     <motion.div
@@ -82,10 +105,7 @@ const Agents = () => {
               Filter
             </Button>
             
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Agent
-            </Button>
+            <AddAgentDialog onAddAgent={handleAddAgent} />
           </div>
         </div>
       </section>
@@ -205,8 +225,12 @@ const Agents = () => {
                             </Link>
                             <DropdownMenuItem>Edit Agent</DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
-                              Deactivate
+                            <DropdownMenuItem 
+                              className="text-destructive"
+                              onClick={() => handleRemoveAgent(agent.id)}
+                            >
+                              <Trash className="h-4 w-4 mr-2" />
+                              Remove Agent
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
