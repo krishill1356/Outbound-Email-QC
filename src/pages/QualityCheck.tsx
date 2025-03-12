@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -23,6 +22,7 @@ import Logo from '@/components/common/Logo';
 import QCEmailViewer from '@/components/quality/QCEmailViewer';
 import QCScoreForm from '@/components/quality/QCScoreForm';
 import { ZammadEmail, fetchEmails, getZammadSettings, fetchAgents } from '@/services/zammadService';
+import { analyzeEmailContent } from '@/services/aiScoringService';
 import { ScoreResult } from '@/types';
 import { format, subDays } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -185,6 +185,38 @@ const QualityCheck = () => {
     });
   };
 
+  // Handle auto-scoring of emails
+  const handleAutoScore = async (email: ZammadEmail) => {
+    if (!email) {
+      toast({
+        title: "No Email Selected",
+        description: "Please select an email to analyze.",
+        variant: "destructive"
+      });
+      throw new Error("No email selected");
+    }
+    
+    try {
+      // Use AI service to analyze the email
+      const result = await analyzeEmailContent(email);
+      
+      toast({
+        title: "AI Analysis Complete",
+        description: "Email has been analyzed and scored by AI.",
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('Auto-scoring error:', error);
+      toast({
+        title: "AI Analysis Failed",
+        description: "Unable to automatically analyze this email. Try manual scoring.",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -344,6 +376,8 @@ const QualityCheck = () => {
           onSubmit={handleQCSubmit} 
           isSubmitting={isSubmittingQC} 
           disabled={!selectedEmail}
+          email={selectedEmail}
+          onAutoScore={handleAutoScore}
         />
       </div>
     </motion.div>

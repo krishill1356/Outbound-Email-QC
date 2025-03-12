@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,18 +9,27 @@ import { Slider } from '@/components/ui/slider';
 import { CRITERIA } from '@/lib/mock-data';
 import { Separator } from '@/components/ui/separator';
 import { ScoreResult } from '@/types';
-import { Save, Loader2 } from 'lucide-react';
+import { Save, Loader2, Wand2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface QCScoreFormProps {
   onSubmit: (scores: ScoreResult[], feedback: string, recommendations: string[]) => void;
   isSubmitting: boolean;
   disabled?: boolean;
+  email?: any; // The selected email to assess
+  onAutoScore?: (email: any) => Promise<{
+    scores: ScoreResult[];
+    generalFeedback: string;
+    recommendations: string[];
+  }>;
 }
 
 const QCScoreForm: React.FC<QCScoreFormProps> = ({ 
   onSubmit, 
   isSubmitting, 
-  disabled = false 
+  disabled = false,
+  email = null,
+  onAutoScore
 }) => {
   const [scores, setScores] = useState<ScoreResult[]>(
     CRITERIA.map(criteria => ({
@@ -31,6 +40,23 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
   );
   const [generalFeedback, setGeneralFeedback] = useState('');
   const [recommendations, setRecommendations] = useState<string[]>(['']);
+  const [isAutoScoring, setIsAutoScoring] = useState(false);
+  const [aiAssisted, setAiAssisted] = useState(false);
+
+  // Reset form when email changes
+  useEffect(() => {
+    if (!email) {
+      // Reset form to defaults
+      setScores(CRITERIA.map(criteria => ({
+        criteriaId: criteria.id,
+        score: 7,
+        feedback: ''
+      })));
+      setGeneralFeedback('');
+      setRecommendations(['']);
+      setAiAssisted(false);
+    }
+  }, [email]);
 
   const handleScoreChange = (criteriaId: string, score: number) => {
     setScores(prev => 
@@ -67,6 +93,30 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
     onSubmit(scores, generalFeedback, filteredRecommendations);
   };
 
+  const handleAutoScore = async () => {
+    if (!email || !onAutoScore) return;
+    
+    setIsAutoScoring(true);
+    
+    try {
+      const result = await onAutoScore(email);
+      
+      setScores(result.scores);
+      setGeneralFeedback(result.generalFeedback);
+      
+      // Convert recommendations array to the form state format
+      if (result.recommendations.length > 0) {
+        setRecommendations(result.recommendations);
+      }
+      
+      setAiAssisted(true);
+    } catch (error) {
+      console.error('Auto-scoring failed:', error);
+    } finally {
+      setIsAutoScoring(false);
+    }
+  };
+
   // Calculate overall score as weighted average
   const overallScore = scores.reduce((total, score) => {
     const criteria = CRITERIA.find(c => c.id === score.criteriaId);
@@ -77,11 +127,36 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
     <Card className="h-full">
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          <span>Quality Assessment</span>
+          <span className="flex items-center gap-2">
+            Quality Assessment
+            {aiAssisted && <Badge variant="secondary" className="ml-2">AI Assisted</Badge>}
+          </span>
           <span className="text-3xl font-bold">{overallScore}/10</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6 overflow-y-auto max-h-[600px] pr-2">
+        {email && onAutoScore && (
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={handleAutoScore}
+            disabled={disabled || isSubmitting || isAutoScoring}
+          >
+            {isAutoScoring ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Analyzing Email...
+              </>
+            ) : (
+              <>
+                <Wand2 className="h-4 w-4 mr-2" />
+                Auto-Score with AI
+              </>
+            )}
+          </Button>
+        )}
+        
         {CRITERIA.map(criteria => (
           <div key={criteria.id} className="space-y-2">
             <div className="flex justify-between items-center">
@@ -122,7 +197,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
             className="h-32 resize-none"
             value={generalFeedback}
             onChange={(e) => setGeneralFeedback(e.target.value)}
-            disabled={disabled || isSubmitting}
+            disabled={disabled || isSubmitting || isAutoScoring}
           />
         </div>
 
@@ -134,7 +209,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
                 placeholder="Add recommendation for improvement"
                 value={rec}
                 onChange={(e) => updateRecommendation(index, e.target.value)}
-                disabled={disabled || isSubmitting}
+                disabled={disabled || isSubmitting || isAutoScoring}
               />
               {recommendations.length > 1 && (
                 <Button
@@ -142,7 +217,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => removeRecommendation(index)}
-                  disabled={disabled || isSubmitting}
+                  disabled={disabled || isSubmitting || isAutoScoring}
                 >
                   -
                 </Button>
@@ -153,7 +228,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={addRecommendation}
-                  disabled={disabled || isSubmitting}
+                  disabled={disabled || isSubmitting || isAutoScoring}
                 >
                   +
                 </Button>
@@ -166,7 +241,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
         <Button 
           className="w-full" 
           onClick={handleSubmit}
-          disabled={disabled || isSubmitting}
+          disabled={disabled || isSubmitting || isAutoScoring}
         >
           {isSubmitting ? (
             <>
