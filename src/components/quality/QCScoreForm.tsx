@@ -9,8 +9,15 @@ import { Slider } from '@/components/ui/slider';
 import { CRITERIA } from '@/lib/mock-data';
 import { Separator } from '@/components/ui/separator';
 import { ScoreResult } from '@/types';
-import { Save, Loader2, Wand2 } from 'lucide-react';
+import { Save, Loader2, Wand2, AlertCircle, Check, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 
 interface QCScoreFormProps {
   onSubmit: (scores: ScoreResult[], feedback: string, recommendations: string[]) => void;
@@ -21,15 +28,28 @@ interface QCScoreFormProps {
     scores: ScoreResult[];
     generalFeedback: string;
     recommendations: string[];
+    templateAnalysis?: {
+      detectedTemplate?: string;
+      missingComponents?: string[];
+      prohibitedPhrases?: string[];
+    };
   }>;
+  onTemplateChange?: (template: string) => void;
 }
+
+const EMAIL_TEMPLATES = [
+  { id: 'air_travel_claim', name: 'Air Travel Claim' },
+  { id: 'my_law_matters', name: 'My Law Matters' },
+  { id: 'general', name: 'General Response' }
+];
 
 const QCScoreForm: React.FC<QCScoreFormProps> = ({ 
   onSubmit, 
   isSubmitting, 
   disabled = false,
   email = null,
-  onAutoScore
+  onAutoScore,
+  onTemplateChange
 }) => {
   const [scores, setScores] = useState<ScoreResult[]>(
     CRITERIA.map(criteria => ({
@@ -42,6 +62,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
   const [recommendations, setRecommendations] = useState<string[]>(['']);
   const [isAutoScoring, setIsAutoScoring] = useState(false);
   const [aiAssisted, setAiAssisted] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
 
   // Reset form when email changes
   useEffect(() => {
@@ -55,6 +76,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
       setGeneralFeedback('');
       setRecommendations(['']);
       setAiAssisted(false);
+      setSelectedTemplate('');
     }
   }, [email]);
 
@@ -93,6 +115,13 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
     onSubmit(scores, generalFeedback, filteredRecommendations);
   };
 
+  const handleTemplateChange = (template: string) => {
+    setSelectedTemplate(template);
+    if (onTemplateChange) {
+      onTemplateChange(template);
+    }
+  };
+
   const handleAutoScore = async () => {
     if (!email || !onAutoScore) return;
     
@@ -107,6 +136,14 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
       // Convert recommendations array to the form state format
       if (result.recommendations.length > 0) {
         setRecommendations(result.recommendations);
+      }
+      
+      // Set detected template if available
+      if (result.templateAnalysis?.detectedTemplate) {
+        setSelectedTemplate(result.templateAnalysis.detectedTemplate);
+        if (onTemplateChange) {
+          onTemplateChange(result.templateAnalysis.detectedTemplate);
+        }
       }
       
       setAiAssisted(true);
@@ -135,6 +172,28 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6 overflow-y-auto max-h-[600px] pr-2">
+        {email && (
+          <div className="space-y-2">
+            <Label htmlFor="template-select">Email Template</Label>
+            <Select 
+              value={selectedTemplate} 
+              onValueChange={handleTemplateChange}
+              disabled={disabled || isSubmitting}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select template" />
+              </SelectTrigger>
+              <SelectContent>
+                {EMAIL_TEMPLATES.map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        
         {email && onAutoScore && (
           <Button
             type="button"
@@ -219,7 +278,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
                   onClick={() => removeRecommendation(index)}
                   disabled={disabled || isSubmitting || isAutoScoring}
                 >
-                  -
+                  <X className="h-4 w-4" />
                 </Button>
               )}
               {index === recommendations.length - 1 && (
@@ -230,7 +289,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
                   onClick={addRecommendation}
                   disabled={disabled || isSubmitting || isAutoScoring}
                 >
-                  +
+                  <Check className="h-4 w-4" />
                 </Button>
               )}
             </div>
