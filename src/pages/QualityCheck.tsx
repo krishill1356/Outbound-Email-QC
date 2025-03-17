@@ -209,7 +209,7 @@ const QualityCheck = () => {
     }
   };
 
-  const handleQCSubmit = (scores: ScoreResult[], feedback: string, recommendations: string[]) => {
+  const handleQCSubmit = (scores: ScoreResult[], feedback: string, recommendations: string[], agentName: string) => {
     if (!selectedEmail) return;
     
     setIsSubmittingQC(true);
@@ -220,7 +220,7 @@ const QualityCheck = () => {
       setIsSubmittingQC(false);
       toast({
         title: "Quality Check Saved",
-        description: `Assessment for ticket #${selectedEmail.ticketNumber} has been saved successfully.`,
+        description: `Assessment for ${agentName}'s email (ticket #${selectedEmail.ticketNumber}) has been saved successfully.`,
       });
       
       // Clear selection to allow for next assessment

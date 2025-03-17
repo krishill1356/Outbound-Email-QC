@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +19,7 @@ import {
 } from '@/components/ui/select';
 
 interface QCScoreFormProps {
-  onSubmit: (scores: ScoreResult[], feedback: string, recommendations: string[]) => void;
+  onSubmit: (scores: ScoreResult[], feedback: string, recommendations: string[], agentName: string) => void;
   isSubmitting: boolean;
   disabled?: boolean;
   email?: any; // The selected email to assess
@@ -134,7 +133,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
 
   const handleSubmit = () => {
     const filteredRecommendations = recommendations.filter(r => r.trim() !== '');
-    onSubmit(scores, generalFeedback, filteredRecommendations);
+    onSubmit(scores, generalFeedback, filteredRecommendations, email?.agentName || 'Unknown Agent');
   };
 
   const handleTemplateChange = (template: string) => {
