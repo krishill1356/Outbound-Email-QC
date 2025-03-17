@@ -1,236 +1,180 @@
+import { getSettings } from '@/services/settingsService';
 
-// This service is responsible for communicating with the Zammad API
-
-interface ZammadSettings {
-  apiUrl: string;
-  apiToken: string;
-}
-
+// Define the structure for Zammad email
 export interface ZammadEmail {
   id: string;
+  ticketId: string; // Changed from number to string
+  ticketNumber: string; // Changed from number to string
   subject: string;
   body: string;
   from: string;
   to: string;
-  createdAt: string;
   agentId: string;
   agentName: string;
-  ticketId: string;
-  ticketNumber: string;
+  createdAt: string;
 }
 
-// Function to fetch emails from Zammad
-export const fetchEmails = async (
-  settings: ZammadSettings, 
-  dateFrom: string, 
-  dateTo: string, 
-  agentId?: string
-): Promise<ZammadEmail[]> => {
-  if (!settings.apiUrl || !settings.apiToken) {
-    console.error('Zammad settings are not configured properly');
-    return [];
+// Function to fetch emails from Zammad API
+export const fetchEmails = async (settings: any, fromDate: string, toDate: string, agentId?: string): Promise<ZammadEmail[]> => {
+  const apiUrl = settings.apiUrl;
+  const apiToken = settings.apiToken;
+
+  let url = `${apiUrl}/api/v1/tickets/search?query=created_at:>="${fromDate}" created_at:<="${toDate}"`;
+  if (agentId) {
+    url += `+ AND +owner_id:=${agentId}`;
   }
 
   try {
-    // Format the date range for the API query
-    const formattedDateFrom = new Date(dateFrom).toISOString();
-    const formattedDateTo = new Date(dateTo).toISOString();
-    
-    // Build the API URL with query parameters
-    let apiEndpoint = `${settings.apiUrl}/api/v1/tickets/search?query=`;
-    
-    // Add date range to query
-    let query = `created_at:>=${formattedDateFrom} created_at:<=${formattedDateTo}`;
-    
-    // Add agent filter if provided
-    if (agentId) {
-      query += ` AND owner.id:${agentId}`;
-    }
-    
-    // Encode the query for URL
-    apiEndpoint += encodeURIComponent(query);
-    
-    // Make the API request
-    const response = await fetch(apiEndpoint, {
-      method: 'GET',
+    const response = await fetch(url, {
       headers: {
-        'Authorization': `Token token=${settings.apiToken}`,
+        'Authorization': `Token token=${apiToken}`,
         'Content-Type': 'application/json'
       }
     });
-    
+
     if (!response.ok) {
-      throw new Error(`Zammad API error: ${response.status} ${response.statusText}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
-    // Parse the ticket IDs from the search response
-    const ticketIds = await response.json();
-    
-    // Fetch detailed information for each ticket
-    const emails: ZammadEmail[] = await Promise.all(
-      ticketIds.map(async (ticketId: string) => {
-        const ticketResponse = await fetch(`${settings.apiUrl}/api/v1/tickets/${ticketId}?expand=true`, {
-          method: 'GET',
+
+    const data = await response.json();
+    const ticketIds = data.results;
+
+    // Fetch each ticket detail
+    const emailData = await Promise.all(
+      ticketIds.map(async (ticketId: number) => {
+        const ticketResponse = await fetch(`${apiUrl}/api/v1/tickets/${ticketId}`, {
           headers: {
-            'Authorization': `Token token=${settings.apiToken}`,
+            'Authorization': `Token token=${apiToken}`,
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (!ticketResponse.ok) {
-          throw new Error(`Failed to fetch ticket ${ticketId}`);
+          console.error(`Failed to fetch ticket ${ticketId}: ${ticketResponse.status}`);
+          return null;
         }
-        
-        const ticket = await ticketResponse.json();
-        
-        // Get the first article (email) from the ticket
-        const articleResponse = await fetch(`${settings.apiUrl}/api/v1/ticket_articles/by_ticket/${ticketId}`, {
-          method: 'GET',
+
+        const ticketData = await ticketResponse.json();
+
+        // Fetch articles for the ticket
+        const articlesResponse = await fetch(`${apiUrl}/api/v1/ticket_articles/by_ticket/${ticketId}`, {
           headers: {
-            'Authorization': `Token token=${settings.apiToken}`,
+            'Authorization': `Token token=${apiToken}`,
             'Content-Type': 'application/json'
           }
         });
-        
-        if (!articleResponse.ok) {
-          throw new Error(`Failed to fetch articles for ticket ${ticketId}`);
+
+        if (!articlesResponse.ok) {
+          console.error(`Failed to fetch articles for ticket ${ticketId}: ${articlesResponse.status}`);
+          return null;
         }
-        
-        const articles = await articleResponse.json();
-        const agentEmail = articles.find((article: any) => article.sender_id === 1); // Sender ID 1 is usually the agent
-        
-        if (!agentEmail) {
-          return null; // Skip tickets without agent replies
+
+        const articlesData = await articlesResponse.json();
+
+        // Find the latest email article
+        const latestEmailArticle = articlesData
+          .filter((article: any) => article.type === 'email' && article.internal === false)
+          .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+        if (!latestEmailArticle) {
+          console.warn(`No suitable email article found for ticket ${ticketId}`);
+          return null;
         }
-        
+
+        // Extract relevant information
+        const subject = ticketData.title || 'No Subject';
+        const body = latestEmailArticle.body || 'No Body';
+        const from = latestEmailArticle.from || 'Unknown Sender';
+        const to = latestEmailArticle.to || 'Unknown Recipient';
+        const agentId = ticketData.owner_id ? ticketData.owner_id.toString() : 'Unknown Agent';
+
         // Fetch agent information
-        const agentResponse = await fetch(`${settings.apiUrl}/api/v1/users/${ticket.owner_id}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Token token=${settings.apiToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!agentResponse.ok) {
-          throw new Error(`Failed to fetch agent ${ticket.owner_id}`);
-        }
-        
-        const agent = await agentResponse.json();
-        
-        return {
-          id: agentEmail.id,
-          subject: ticket.title,
-          body: agentEmail.body,
-          from: agentEmail.from,
-          to: agentEmail.to,
-          createdAt: agentEmail.created_at,
-          agentId: agent.id,
-          agentName: `${agent.firstname} ${agent.lastname}`,
-          ticketId: ticket.id,
-          ticketNumber: ticket.number
+        const agentName = await fetchAgentName(apiUrl, apiToken, agentId);
+
+        const email: ZammadEmail = {
+          id: latestEmailArticle.id.toString(),
+          ticketId: ticketData.id.toString(),
+          ticketNumber: ticketData.number.toString(),
+          subject,
+          body,
+          from,
+          to,
+          agentId,
+          agentName,
+          createdAt: latestEmailArticle.created_at
         };
+
+        return email;
       })
     );
-    
-    // Filter out any null values (tickets without agent replies)
-    return emails.filter(email => email !== null);
+
+    // Filter out any null results from failed ticket fetches
+    return emailData.filter(email => email !== null) as ZammadEmail[];
+
   } catch (error) {
-    console.error('Error fetching emails from Zammad:', error);
+    console.error('Failed to fetch emails from Zammad:', error);
     throw error;
   }
 };
 
-// Function to test Zammad connection
-export const testConnection = async (settings: ZammadSettings): Promise<boolean> => {
+// Function to fetch agent name by ID
+const fetchAgentName = async (apiUrl: string, apiToken: string, agentId: string): Promise<string> => {
   try {
-    // Try to fetch the current user as a simple way to test the connection
-    const response = await fetch(`${settings.apiUrl}/api/v1/users/me`, {
-      method: 'GET',
+    const response = await fetch(`${apiUrl}/api/v1/users/${agentId}`, {
       headers: {
-        'Authorization': `Token token=${settings.apiToken}`,
+        'Authorization': `Token token=${apiToken}`,
         'Content-Type': 'application/json'
       }
     });
-    
-    return response.ok;
-  } catch (error) {
-    console.error('Error testing Zammad connection:', error);
-    return false;
-  }
-};
 
-// Function to fetch Zammad agents (for filtering)
-export const fetchAgents = async (settings: ZammadSettings): Promise<{ id: string, name: string }[]> => {
-  try {
-    // Get agent roles (usually role_id 2 is the agent role)
-    const response = await fetch(`${settings.apiUrl}/api/v1/roles`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Token token=${settings.apiToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
     if (!response.ok) {
-      throw new Error(`Failed to fetch roles: ${response.status}`);
+      console.error(`Failed to fetch agent ${agentId}: ${response.status}`);
+      return 'Unknown Agent';
     }
-    
-    const roles = await response.json();
-    const agentRoleId = roles.find((role: any) => role.name.toLowerCase().includes('agent'))?.id || 2;
-    
-    // Get all users with the agent role
-    const usersResponse = await fetch(`${settings.apiUrl}/api/v1/users/search?query=role_ids:${agentRoleId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Token token=${settings.apiToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!usersResponse.ok) {
-      throw new Error(`Failed to fetch users: ${usersResponse.status}`);
-    }
-    
-    const userIds = await usersResponse.json();
-    
-    // Get details for each agent
-    const agents = await Promise.all(
-      userIds.map(async (userId: string) => {
-        const userResponse = await fetch(`${settings.apiUrl}/api/v1/users/${userId}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Token token=${settings.apiToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!userResponse.ok) {
-          return null;
-        }
-        
-        const user = await userResponse.json();
-        return {
-          id: user.id,
-          name: `${user.firstname} ${user.lastname}`
-        };
-      })
-    );
-    
-    return agents.filter(agent => agent !== null);
+
+    const agentData = await response.json();
+    return agentData.firstname + ' ' + agentData.lastname;
+
   } catch (error) {
-    console.error('Error fetching Zammad agents:', error);
-    return [];
+    console.error(`Failed to fetch agent name for ${agentId}:`, error);
+    return 'Unknown Agent';
   }
 };
 
-// Function to save Zammad settings (would normally save to localStorage or backend)
-export const saveZammadSettings = (settings: ZammadSettings): void => {
-  localStorage.setItem('zammadSettings', JSON.stringify(settings));
+// Function to fetch all agents from Zammad
+export const fetchAgents = async (settings: any): Promise<{id: string, name: string}[]> => {
+  const apiUrl = settings.apiUrl;
+  const apiToken = settings.apiToken;
+
+  try {
+    const response = await fetch(`${apiUrl}/api/v1/users?expand=true`, {
+      headers: {
+        'Authorization': `Token token=${apiToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const agentsData = await response.json();
+
+    // Filter out agents that are not active and map the data
+    return agentsData
+      .filter((agent: any) => agent.active === true)
+      .map((agent: any) => ({
+        id: agent.id.toString(),
+        name: `${agent.firstname} ${agent.lastname}`
+      }));
+
+  } catch (error) {
+    console.error('Failed to fetch agents from Zammad:', error);
+    throw error;
+  }
 };
 
-// Function to get saved Zammad settings
-export const getZammadSettings = (): ZammadSettings | null => {
-  const settings = localStorage.getItem('zammadSettings');
-  return settings ? JSON.parse(settings) : null;
+// Function to get Zammad settings from local storage
+export const getZammadSettings = () => {
+  return getSettings('zammad');
 };

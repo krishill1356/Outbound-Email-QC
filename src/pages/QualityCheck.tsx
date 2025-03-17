@@ -194,7 +194,7 @@ const QualityCheck = () => {
     });
   };
 
-  // Handle auto-scoring of emails with added template analysis
+  // Fix the handleAutoScore function by ensuring it handles the templateResults correctly
   const handleAutoScore = async (email: ZammadEmail) => {
     if (!email) {
       toast({
@@ -210,15 +210,19 @@ const QualityCheck = () => {
       const templateResults = await analyzeEmailTemplate(email.body);
       setTemplateAnalysis(templateResults);
       
-      // Then use AI service to analyze the email
-      const result = await analyzeEmailContent(email, templateResults);
+      // Then use AI service to analyze the email, passing only the email
+      // This fixes the first error - analyzeEmailContent now expects only one argument
+      const result = await analyzeEmailContent(email);
       
       toast({
         title: "AI Analysis Complete",
         description: "Email has been analyzed and scored by AI.",
       });
       
-      return result;
+      return {
+        ...result,
+        templateAnalysis
+      };
     } catch (error) {
       console.error('Auto-scoring error:', error);
       toast({
@@ -230,13 +234,14 @@ const QualityCheck = () => {
     }
   };
 
-  // Handle pasted email content
+  // Fix the handlePastedEmail function by ensuring the ticketId and ticketNumber are strings
   const handlePastedEmail = async (emailContent: string, subject: string) => {
     // Create a synthetic email object
+    // Fix the type errors on lines 238-239 by converting numbers to strings
     const pastedEmail: ZammadEmail = {
       id: `pasted-${Date.now()}`,
-      ticketId: 0,
-      ticketNumber: 0,
+      ticketId: "0", // Changed from number to string
+      ticketNumber: "0", // Changed from number to string
       subject,
       body: emailContent,
       from: "Pasted Email",

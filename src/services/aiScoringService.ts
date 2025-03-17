@@ -17,7 +17,7 @@ interface AIScoreResponse {
   recommendations: string[];
 }
 
-// Function to analyze email content and generate scores using AI
+// Update the function signature to only accept email parameter
 export const analyzeEmailContent = async (email: ZammadEmail): Promise<AIScoreResponse> => {
   try {
     // For now, we'll use a simulated AI response since we don't have a real AI API connected
