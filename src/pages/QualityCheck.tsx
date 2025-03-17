@@ -48,8 +48,16 @@ const QualityCheck = () => {
     missingComponents?: string[];
     prohibitedPhrases?: string[];
   } | undefined>(undefined);
+  
+  // New state for AI analysis results
+  const [aiAnalysisResults, setAiAnalysisResults] = useState<{
+    scores: ScoreResult[];
+    generalFeedback: string;
+    recommendations: string[];
+  } | null>(null);
+  
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Check if Zammad is configured
   useEffect(() => {
     const settings = getZammadSettings();
     setZammadConfigured(!!settings?.apiUrl && !!settings?.apiToken);
@@ -59,7 +67,6 @@ const QualityCheck = () => {
     }
   }, []);
 
-  // Load agents from Zammad
   const loadAgents = async (settings: any) => {
     try {
       const agentList = await fetchAgents(settings);
@@ -69,7 +76,6 @@ const QualityCheck = () => {
     }
   };
 
-  // Filter emails when search query changes
   useEffect(() => {
     if (!searchQuery.trim()) {
       setFilteredEmails(emails);
@@ -88,7 +94,46 @@ const QualityCheck = () => {
     setFilteredEmails(filtered);
   }, [searchQuery, emails]);
 
-  // Calculate date range based on selection
+  // Automatically analyze email when selected
+  useEffect(() => {
+    if (selectedEmail) {
+      analyzeSelectedEmail(selectedEmail);
+    } else {
+      // Reset analysis when no email is selected
+      setTemplateAnalysis(undefined);
+      setAiAnalysisResults(null);
+    }
+  }, [selectedEmail]);
+
+  // Function to analyze the selected email
+  const analyzeSelectedEmail = async (email: ZammadEmail) => {
+    setIsAnalyzing(true);
+    
+    try {
+      // Analyze template
+      const templateResults = await analyzeEmailTemplate(email.body);
+      setTemplateAnalysis(templateResults);
+      
+      // Analyze content with AI
+      const aiResults = await analyzeEmailContent(email);
+      setAiAnalysisResults(aiResults);
+      
+      toast({
+        title: "Analysis Complete",
+        description: "Email has been automatically analyzed",
+      });
+    } catch (error) {
+      console.error('Email analysis error:', error);
+      toast({
+        title: "Analysis Failed",
+        description: "Failed to analyze email content",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   const getDateRange = () => {
     const today = new Date();
     let fromDate;
@@ -116,7 +161,6 @@ const QualityCheck = () => {
     };
   };
 
-  // Fetch emails from Zammad API
   const handleFetchEmails = async () => {
     const settings = getZammadSettings();
     
@@ -165,7 +209,6 @@ const QualityCheck = () => {
     }
   };
 
-  // Handle QC form submission
   const handleQCSubmit = (scores: ScoreResult[], feedback: string, recommendations: string[]) => {
     if (!selectedEmail) return;
     
@@ -188,13 +231,13 @@ const QualityCheck = () => {
       emailId: selectedEmail.id,
       ticketId: selectedEmail.ticketId,
       agentId: selectedEmail.agentId,
+      agentName: selectedEmail.agentName, // Include agent name for reporting
       scores, 
       feedback, 
       recommendations 
     });
   };
 
-  // Fix the handleAutoScore function by ensuring it handles the templateResults correctly
   const handleAutoScore = async (email: ZammadEmail) => {
     if (!email) {
       toast({
@@ -210,9 +253,9 @@ const QualityCheck = () => {
       const templateResults = await analyzeEmailTemplate(email.body);
       setTemplateAnalysis(templateResults);
       
-      // Then use AI service to analyze the email, passing only the email
-      // This fixes the first error - analyzeEmailContent now expects only one argument
+      // Then use AI service to analyze the email
       const result = await analyzeEmailContent(email);
+      setAiAnalysisResults(result);
       
       toast({
         title: "AI Analysis Complete",
@@ -234,14 +277,12 @@ const QualityCheck = () => {
     }
   };
 
-  // Fix the handlePastedEmail function by ensuring the ticketId and ticketNumber are strings
   const handlePastedEmail = async (emailContent: string, subject: string) => {
     // Create a synthetic email object
-    // Fix the type errors on lines 238-239 by converting numbers to strings
     const pastedEmail: ZammadEmail = {
       id: `pasted-${Date.now()}`,
-      ticketId: "0", // Changed from number to string
-      ticketNumber: "0", // Changed from number to string
+      ticketId: "0", 
+      ticketNumber: "0", 
       subject,
       body: emailContent,
       from: "Pasted Email",
@@ -253,19 +294,8 @@ const QualityCheck = () => {
 
     setSelectedEmail(pastedEmail);
     
-    // Analyze the template
-    try {
-      const templateResults = await analyzeEmailTemplate(emailContent);
-      setTemplateAnalysis(templateResults);
-      
-      toast({
-        title: "Email Loaded",
-        description: "Email content has been loaded for analysis.",
-      });
-    } catch (error) {
-      console.error('Template analysis error:', error);
-      setTemplateAnalysis(undefined);
-    }
+    // Analyze the template and content automatically
+    // The useEffect will trigger the analysis
   };
 
   return (
@@ -439,9 +469,11 @@ const QualityCheck = () => {
         <QCScoreForm 
           onSubmit={handleQCSubmit} 
           isSubmitting={isSubmittingQC} 
-          disabled={!selectedEmail}
+          disabled={!selectedEmail || isAnalyzing}
           email={selectedEmail}
           onAutoScore={handleAutoScore}
+          initialData={aiAnalysisResults || undefined}
+          isAnalyzing={isAnalyzing}
         />
       </div>
     </motion.div>

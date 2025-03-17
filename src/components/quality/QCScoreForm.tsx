@@ -9,7 +9,7 @@ import { Slider } from '@/components/ui/slider';
 import { CRITERIA } from '@/lib/mock-data';
 import { Separator } from '@/components/ui/separator';
 import { ScoreResult } from '@/types';
-import { Save, Loader2, Wand2, AlertCircle, Check, X } from 'lucide-react';
+import { Save, Loader2, Wand2, AlertCircle, Check, X, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { 
   Select, 
@@ -35,6 +35,12 @@ interface QCScoreFormProps {
     };
   }>;
   onTemplateChange?: (template: string) => void;
+  initialData?: {
+    scores: ScoreResult[];
+    generalFeedback: string;
+    recommendations: string[];
+  };
+  isAnalyzing?: boolean;
 }
 
 const EMAIL_TEMPLATES = [
@@ -49,7 +55,9 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
   disabled = false,
   email = null,
   onAutoScore,
-  onTemplateChange
+  onTemplateChange,
+  initialData,
+  isAnalyzing = false
 }) => {
   const [scores, setScores] = useState<ScoreResult[]>(
     CRITERIA.map(criteria => ({
@@ -63,6 +71,20 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
   const [isAutoScoring, setIsAutoScoring] = useState(false);
   const [aiAssisted, setAiAssisted] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('');
+
+  // Load initial data when it becomes available
+  useEffect(() => {
+    if (initialData) {
+      setScores(initialData.scores);
+      setGeneralFeedback(initialData.generalFeedback);
+      
+      if (initialData.recommendations.length > 0) {
+        setRecommendations(initialData.recommendations);
+      }
+      
+      setAiAssisted(true);
+    }
+  }, [initialData]);
 
   // Reset form when email changes
   useEffect(() => {
@@ -164,14 +186,29 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
     <Card className="h-full">
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          <span className="flex items-center gap-2">
-            Quality Assessment
-            {aiAssisted && <Badge variant="secondary" className="ml-2">AI Assisted</Badge>}
-          </span>
+          <div className="flex flex-col">
+            <span className="flex items-center gap-2">
+              Quality Assessment
+              {aiAssisted && <Badge variant="secondary" className="ml-2">AI Assisted</Badge>}
+            </span>
+            {email && email.agentName && (
+              <div className="flex items-center mt-1 text-sm font-normal text-muted-foreground">
+                <User className="h-3.5 w-3.5 mr-1" />
+                {email.agentName}
+              </div>
+            )}
+          </div>
           <span className="text-3xl font-bold">{overallScore}/10</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6 overflow-y-auto max-h-[600px] pr-2">
+        {isAnalyzing && (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            <span>Analyzing email content...</span>
+          </div>
+        )}
+        
         {email && (
           <div className="space-y-2">
             <Label htmlFor="template-select">Email Template</Label>

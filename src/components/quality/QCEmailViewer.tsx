@@ -1,10 +1,9 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ZammadEmail } from '@/services/zammadService';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, User } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 interface QCEmailViewerProps {
@@ -58,7 +57,10 @@ const QCEmailViewer: React.FC<QCEmailViewerProps> = ({ email, templateAnalysis }
           </div>
           <div className="flex flex-wrap gap-2 justify-between text-sm">
             <div><strong>To:</strong> {email.to}</div>
-            <div><strong>Agent:</strong> {email.agentName}</div>
+            <div className="flex items-center gap-1">
+              <User className="h-3.5 w-3.5" />
+              <strong>Agent:</strong> {email.agentName}
+            </div>
           </div>
         </div>
         
