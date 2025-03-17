@@ -277,7 +277,7 @@ const QualityCheck = () => {
     }
   };
 
-  const handlePastedEmail = async (emailContent: string, subject: string) => {
+  const handlePastedEmail = async (emailContent: string, subject: string, agentName: string) => {
     // Create a synthetic email object
     const pastedEmail: ZammadEmail = {
       id: `pasted-${Date.now()}`,
@@ -288,7 +288,7 @@ const QualityCheck = () => {
       from: "Pasted Email",
       to: "QC Tool",
       agentId: "manual",
-      agentName: "Manual Input",
+      agentName: agentName, // Use the provided agent name
       createdAt: new Date().toISOString()
     };
 

@@ -5,14 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Check, Clipboard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface EmailContentInputProps {
-  onSubmit: (emailContent: string, subject: string) => void;
+  onSubmit: (emailContent: string, subject: string, agentName: string) => void;
 }
 
 const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
   const [emailContent, setEmailContent] = useState('');
   const [subject, setSubject] = useState('');
+  const [agentName, setAgentName] = useState('');
   const [isPasting, setIsPasting] = useState(false);
   const { toast } = useToast();
 
@@ -36,7 +39,16 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
       return;
     }
 
-    onSubmit(emailContent, subject);
+    if (!agentName.trim()) {
+      toast({
+        title: "Agent name required",
+        description: "Please provide the agent's name for reporting",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    onSubmit(emailContent, subject, agentName);
   };
 
   const handlePasteFromClipboard = async () => {
@@ -71,23 +83,27 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label htmlFor="subject" className="text-sm font-medium">
-              Email Subject
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="subject"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="Enter the email subject"
-              />
-            </div>
+            <Label htmlFor="subject">Email Subject</Label>
+            <Input
+              id="subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Enter the email subject"
+            />
           </div>
+          
           <div className="space-y-2">
-            <label htmlFor="email-content" className="text-sm font-medium">
-              Email Body
-            </label>
+            <Label htmlFor="agent-name">Agent Name</Label>
+            <Input
+              id="agent-name"
+              value={agentName}
+              onChange={(e) => setAgentName(e.target.value)}
+              placeholder="Enter the agent's name for reporting"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="email-content">Email Body</Label>
             <div className="relative">
               <Textarea
                 id="email-content"
