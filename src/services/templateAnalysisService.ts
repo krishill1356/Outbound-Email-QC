@@ -1,42 +1,24 @@
 
-interface EmailTemplate {
-  id: string;
-  name: string;
-  identifierPatterns: RegExp[];
-  components: {
-    [key: string]: {
-      required: boolean;
-      patterns: RegExp[];
-    }
-  }
-}
+// Template Analysis Service
+// Analyzes emails to check for template consistency
 
-export interface TemplateAnalysisResult {
-  detectedTemplate?: string;
-  templateName?: string;
-  score: number;
-  missingComponents: string[];
-  prohibitedPhrases: string[];
-  componentScores: Record<string, number>;
-}
-
-// Define the email templates based on the Python implementation
-const EMAIL_TEMPLATES: EmailTemplate[] = [
-  {
-    id: "air_travel_claim",
-    name: "Air Travel Claim",
+/**
+ * Template definitions with their identifier patterns and required components
+ */
+const EMAIL_TEMPLATES = {
+  "air_travel_claim": {
     identifierPatterns: [
       /AIR\s+TRAVEL\s+CLAIM/i,
     ],
     components: {
-      header: {
+      "header": {
         required: true,
         patterns: [
           /AIR\s+TRAVEL\s+CLAIM/i,
           /WE'VE\s+GOT\s+AN\s+UPDATE\s+FOR\s+YOU!/i
         ]
       },
-      claim_summary: {
+      "claim_summary": {
         required: true,
         patterns: [
           /Claim\s+Summary/i,
@@ -49,49 +31,35 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
           /Flight\s+Claim\s+Reason:/i
         ]
       },
-      greeting: {
+      "greeting": {
         required: true,
         patterns: [
           /Hello\s+\w+,/i,
           /Dear\s+\w+,/i
         ]
       },
-      thank_you_intro: {
+      "thank_you_intro": {
         required: true,
         patterns: [
           /Thank\s+you\s+for\s+reaching\s+out/i,
           /We\s+appreciate\s+your\s+patience/i
         ]
       },
-      main_content: {
-        required: true,
-        patterns: [
-          /specificcontent/i
-        ]
-      },
-      claim_info: {
-        required: false,
-        patterns: [
-          /Please\s+be\s+aware\s+that\s+the\s+time/i,
-          /airline\s+tactics/i,
-          /best\s+possible\s+outcome/i
-        ]
-      },
-      update_promise: {
+      "update_promise": {
         required: true,
         patterns: [
           /we\s+will\s+keep\s+you\s+informed/i,
           /ensure\s+you\s+receive\s+these\s+updates/i
         ]
       },
-      help_section: {
+      "help_section": {
         required: true,
         patterns: [
-          /Questions\?\s+We're\s+to\s+help!/i,
+          /Questions\?\s+We're\s+here\s+to\s+help!/i,
           /frequently\s+asked\s+questions/i
         ]
       },
-      sign_off: {
+      "sign_off": {
         required: true,
         patterns: [
           /Thank\s+you\s+for\s+choosing/i,
@@ -101,29 +69,27 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
       }
     }
   },
-  {
-    id: "my_law_matters",
-    name: "My Law Matters",
+  "my_law_matters": {
     identifierPatterns: [
       /MY\s+LAW\s+MATTERS/i,
       /Making\s+Law\s+Simple/i
     ],
     components: {
-      header: {
+      "header": {
         required: true,
         patterns: [
           /MY\s+LAW\s+MATTERS/i,
           /Making\s+Law\s+Simple/i
         ]
       },
-      greeting: {
+      "greeting": {
         required: true,
         patterns: [
           /Dear\s+\w+,/i,
           /Dear\s+Sirs,/i
         ]
       },
-      reference: {
+      "reference": {
         required: true,
         patterns: [
           /\[INSERT\s+REFERENCE\]/i,
@@ -131,14 +97,7 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
           /Your\s+Ref:/i
         ]
       },
-      main_content: {
-        required: true,
-        patterns: [
-          /We\s+accept\s+the\s+offer/i,
-          /N270/i
-        ]
-      },
-      sign_off: {
+      "sign_off": {
         required: true,
         patterns: [
           /Kind\s+Regards,/i,
@@ -146,26 +105,20 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
           /Yours\s+sincerely,/i
         ]
       },
-      company_signature: {
+      "company_signature": {
         required: true,
         patterns: [
           /My\s+Law\s+Matters/i
         ]
       },
-      contact_details: {
+      "contact_details": {
         required: true,
         patterns: [
           /E\s+\|\s+\S+@mylawmatters\.co\.uk/i,
           /W\s+\|\s+www\.mylawmatters\.co\.uk/i
         ]
       },
-      office_locations: {
-        required: true,
-        patterns: [
-          /Solihull\s+[\s\S]*\s+Manchester/i
-        ]
-      },
-      regulatory_info: {
+      "regulatory_info": {
         required: true,
         patterns: [
           /My\s+Law\s+Matters\s+is\s+a\s+trading\s+style/i,
@@ -173,7 +126,7 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
           /SRA\s+number\s+\d+/i
         ]
       },
-      confidentiality_notice: {
+      "confidentiality_notice": {
         required: true,
         patterns: [
           /THIS\s+EMAIL\s+[\s\S]*\s+CONFIDENTIAL/i,
@@ -182,128 +135,101 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
       }
     }
   }
-];
+};
 
-// List of prohibited phrases
+// Prohibited phrases across all templates
 const PROHIBITED_PHRASES = [
   "you're wrong",
   "that's not our problem",
   "I can't help you",
-  "not my job",
+  "not my job"
 ];
 
 /**
- * Identify which template the email content matches
+ * Identify which template matches the email content
  */
-export function identifyTemplate(emailContent: string): string | null {
-  for (const template of EMAIL_TEMPLATES) {
+const identifyTemplate = (emailContent: string): string | undefined => {
+  for (const [templateName, template] of Object.entries(EMAIL_TEMPLATES)) {
     for (const pattern of template.identifierPatterns) {
       if (pattern.test(emailContent)) {
-        return template.id;
+        return templateName;
       }
     }
   }
-  return null;
-}
+  return undefined;
+};
 
 /**
- * Get the name of a template by its ID
+ * Check for missing components in the template
  */
-export function getTemplateName(templateId: string): string {
-  const template = EMAIL_TEMPLATES.find(t => t.id === templateId);
-  return template ? template.name : "Unknown Template";
-}
-
-/**
- * Analyze email content against template requirements
- */
-export function analyzeTemplateConsistency(emailContent: string): TemplateAnalysisResult {
-  // Default result structure
-  const result: TemplateAnalysisResult = {
-    score: 0,
-    missingComponents: [],
-    prohibitedPhrases: [],
-    componentScores: {},
-  };
-  
-  // Identify which template to use
-  const templateId = identifyTemplate(emailContent);
-  
-  if (!templateId) {
-    return result;
-  }
-  
-  result.detectedTemplate = templateId;
-  
-  const template = EMAIL_TEMPLATES.find(t => t.id === templateId);
-  
-  if (!template) {
-    return result;
-  }
-  
-  result.templateName = template.name;
-  
-  // Check template components
-  const componentScores: Record<string, number> = {};
+const findMissingComponents = (
+  emailContent: string, 
+  templateName: string
+): string[] => {
   const missingComponents: string[] = [];
+  const template = EMAIL_TEMPLATES[templateName as keyof typeof EMAIL_TEMPLATES];
   
-  // Track components
-  let totalComponents = 0;
-  let foundComponents = 0;
+  if (!template) return [];
   
-  for (const [componentName, componentInfo] of Object.entries(template.components)) {
-    totalComponents++;
+  for (const [componentName, componentData] of Object.entries(template.components)) {
+    if (!componentData.required) continue;
+    
     let componentFound = false;
-    
-    // Skip checking for patterns if component isn't required
-    if (!componentInfo.required) {
-      continue;
-    }
-    
-    // Check if any pattern for this component is found
-    for (const pattern of componentInfo.patterns) {
+    for (const pattern of componentData.patterns) {
       if (pattern.test(emailContent)) {
         componentFound = true;
-        foundComponents++;
         break;
       }
     }
     
-    // Add component result
-    componentScores[componentName] = componentFound ? 1.0 : 0.0;
-    
-    // Track missing required components
-    if (!componentFound && componentInfo.required) {
+    if (!componentFound) {
       missingComponents.push(componentName.replace(/_/g, ' '));
     }
   }
   
-  // Check for prohibited phrases
-  const prohibitedFound: string[] = [];
+  return missingComponents;
+};
+
+/**
+ * Check for prohibited phrases in the email content
+ */
+const findProhibitedPhrases = (emailContent: string): string[] => {
+  const foundPhrases: string[] = [];
+  const lowerContent = emailContent.toLowerCase();
+  
   for (const phrase of PROHIBITED_PHRASES) {
-    if (emailContent.toLowerCase().includes(phrase.toLowerCase())) {
-      prohibitedFound.push(phrase);
+    if (lowerContent.includes(phrase.toLowerCase())) {
+      foundPhrases.push(phrase);
     }
   }
   
-  // Calculate overall template score (max 10)
-  let templateScore = 0;
-  if (totalComponents > 0) {
-    // Component structure accounts for 8 points
-    const componentRatio = foundComponents / totalComponents;
-    const componentPoints = componentRatio * 8;
-    
-    // No prohibited phrases accounts for 2 points
-    const prohibitedPoints = prohibitedFound.length === 0 ? 2 : 0;
-    
-    templateScore = componentPoints + prohibitedPoints;
+  return foundPhrases;
+};
+
+/**
+ * Analyze email content for template adherence
+ */
+export const analyzeEmailTemplate = async (emailContent: string) => {
+  // Identify which template is being used
+  const detectedTemplate = identifyTemplate(emailContent);
+  
+  if (!detectedTemplate) {
+    return {
+      detectedTemplate: undefined,
+      missingComponents: [],
+      prohibitedPhrases: findProhibitedPhrases(emailContent)
+    };
   }
   
-  // Return the result
-  result.score = templateScore;
-  result.componentScores = componentScores;
-  result.missingComponents = missingComponents;
-  result.prohibitedPhrases = prohibitedFound;
+  // Find missing components
+  const missingComponents = findMissingComponents(emailContent, detectedTemplate);
   
-  return result;
-}
+  // Find prohibited phrases
+  const prohibitedPhrases = findProhibitedPhrases(emailContent);
+  
+  return {
+    detectedTemplate: detectedTemplate.replace(/_/g, ' '),
+    missingComponents,
+    prohibitedPhrases
+  };
+};
