@@ -1,10 +1,11 @@
-import { getSettings } from '@/services/settingsService';
+
+import { getSettings, saveSettings } from '@/services/settingsService';
 
 // Define the structure for Zammad email
 export interface ZammadEmail {
   id: string;
-  ticketId: string; // Changed from number to string
-  ticketNumber: string; // Changed from number to string
+  ticketId: string;
+  ticketNumber: string;
   subject: string;
   body: string;
   from: string;
@@ -12,6 +13,12 @@ export interface ZammadEmail {
   agentId: string;
   agentName: string;
   createdAt: string;
+}
+
+// Interface for Zammad settings
+export interface ZammadSettings {
+  apiUrl: string;
+  apiToken: string;
 }
 
 // Function to fetch emails from Zammad API
@@ -175,6 +182,31 @@ export const fetchAgents = async (settings: any): Promise<{id: string, name: str
 };
 
 // Function to get Zammad settings from local storage
-export const getZammadSettings = () => {
+export const getZammadSettings = (): ZammadSettings | null => {
   return getSettings('zammad');
+};
+
+// Function to save Zammad settings to local storage
+export const saveZammadSettings = (settings: ZammadSettings): void => {
+  saveSettings('zammad', settings);
+};
+
+// Function to test connection to Zammad API
+export const testConnection = async (settings: ZammadSettings): Promise<boolean> => {
+  const { apiUrl, apiToken } = settings;
+  
+  try {
+    // Try to fetch a list of agents as a simple connection test
+    const response = await fetch(`${apiUrl}/api/v1/users?limit=1`, {
+      headers: {
+        'Authorization': `Token token=${apiToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    return response.ok;
+  } catch (error) {
+    console.error('Error testing connection to Zammad:', error);
+    return false;
+  }
 };
