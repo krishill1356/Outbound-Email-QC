@@ -1,3 +1,4 @@
+
 export interface QualityCriteria {
   id: string;
   name: string;
@@ -52,4 +53,9 @@ export interface PerformanceData {
 export interface ScoreBreakdown {
   criteriaId: string;
   average: number;
+}
+
+export interface SpellCheckResult {
+  score: number;
+  suggestions: string[];
 }

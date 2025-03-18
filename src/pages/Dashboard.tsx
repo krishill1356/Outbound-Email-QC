@@ -1,17 +1,15 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   BarChart3,
   CheckCircle,
-  ArrowUpCircle,
   Users,
   AlertCircle,
   ChevronRight
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { AGENTS, QUALITY_CHECKS, getPerformanceData } from '@/lib/mock-data';
+import { AGENTS, getPerformanceData, QUALITY_CHECKS } from '@/lib/mock-data';
 import { 
   AreaChart, 
   Area, 
@@ -29,7 +27,28 @@ import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '14d' | '30d'>('7d');
-  const performanceData = getPerformanceData();
+  const [performanceData, setPerformanceData] = useState(getPerformanceData());
+  const [totalReviews, setTotalReviews] = useState(QUALITY_CHECKS.length);
+  const [averageScore, setAverageScore] = useState(0);
+  const [lowPerformers, setLowPerformers] = useState<number>(0);
+  
+  // Update dashboard data when needed
+  useEffect(() => {
+    // Recalculate dashboard data
+    const perfData = getPerformanceData();
+    setPerformanceData(perfData);
+    setTotalReviews(QUALITY_CHECKS.length);
+    
+    // Calculate average score
+    const avgScore = totalReviews > 0 
+      ? Math.round(QUALITY_CHECKS.reduce((sum, check) => sum + check.overallScore, 0) / totalReviews)
+      : 0;
+    setAverageScore(avgScore);
+    
+    // Calculate low performers
+    const lowPerfs = perfData.agents.filter(agent => agent.averageScore < 7);
+    setLowPerformers(lowPerfs.length);
+  }, [QUALITY_CHECKS.length]);
   
   // Filter data based on selected period
   const filterDataByPeriod = (data: any[]) => {
@@ -42,13 +61,6 @@ const Dashboard = () => {
     { value: '14d', label: '14 days' },
     { value: '30d', label: '30 days' },
   ];
-  
-  // Calculate summary stats
-  const totalReviews = QUALITY_CHECKS.length;
-  const averageScore = Number((QUALITY_CHECKS.reduce((sum, check) => sum + check.overallScore, 0) / totalReviews).toFixed(1));
-  
-  // Calculate low performers (agents with avg score < 7)
-  const lowPerformers = performanceData.agents.filter(agent => agent.averageScore < 7);
   
   // Format chart data
   const overallChartData = filterDataByPeriod(performanceData.overall).map(item => ({
@@ -124,7 +136,7 @@ const Dashboard = () => {
               <div className="flex justify-between items-center">
                 <div>
                   <p className="text-muted-foreground text-sm">Low Performers</p>
-                  <h3 className="text-3xl font-bold mt-1">{lowPerformers.length}</h3>
+                  <h3 className="text-3xl font-bold mt-1">{lowPerformers}</h3>
                 </div>
                 <div className="bg-primary/10 p-3 rounded-full">
                   <AlertCircle size={24} className="text-primary" />
@@ -182,6 +194,7 @@ const Dashboard = () => {
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: '#888', fontSize: 12 }}
+                    ticks={[0, 2, 4, 6, 8, 10]}
                   />
                   <Tooltip 
                     contentStyle={{ 
@@ -222,14 +235,13 @@ const Dashboard = () => {
                 >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                   <XAxis dataKey="name" scale="band" axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 10]} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 10]} axisLine={false} tickLine={false} ticks={[0, 2, 4, 6, 8, 10]} />
                   <Tooltip />
                   <Legend />
                   <Bar dataKey="Spelling & Grammar" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="Tone" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Empathy" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Template Consistency" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Solution Clarity" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Clarity" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Structure" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -243,36 +255,45 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {performanceData.agents.map((agentData) => {
-                const scoreColor = 
-                  agentData.averageScore >= 8 ? 'text-green-500' :
-                  agentData.averageScore >= 6 ? 'text-amber-500' :
-                  'text-red-500';
-                  
-                return (
-                  <div key={agentData.agent.id} className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-muted/50 transition-colors group">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
-                        <img 
-                          src={agentData.agent.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(agentData.agent.name)}`} 
-                          alt={agentData.agent.name}
-                          className="w-full h-full object-cover"
-                        />
+              {performanceData.agents.length === 0 ? (
+                <div className="p-4 text-center">
+                  <p className="text-muted-foreground">No agents data available</p>
+                  <Link to="/agents" className="mt-2 inline-block">
+                    <Button variant="outline" size="sm">Add Agents</Button>
+                  </Link>
+                </div>
+              ) : (
+                performanceData.agents.map((agentData) => {
+                  const scoreColor = 
+                    agentData.averageScore >= 8 ? 'text-green-500' :
+                    agentData.averageScore >= 6 ? 'text-amber-500' :
+                    'text-red-500';
+                    
+                  return (
+                    <div key={agentData.agent.id} className="flex items-center justify-between p-3 rounded-lg bg-background hover:bg-muted/50 transition-colors group">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                          <img 
+                            src={agentData.agent.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(agentData.agent.name)}`} 
+                            alt={agentData.agent.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">{agentData.agent.name}</h4>
+                          <p className="text-sm text-muted-foreground">{agentData.checksCount} reviews</p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-medium">{agentData.agent.name}</h4>
-                        <p className="text-sm text-muted-foreground">{agentData.checksCount} reviews</p>
+                      <div className="flex items-center">
+                        <span className={`font-semibold text-lg ${scoreColor}`}>
+                          {Math.round(agentData.averageScore)}/10
+                        </span>
+                        <ChevronRight className="ml-2 w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </div>
-                    <div className="flex items-center">
-                      <span className={`font-semibold text-lg ${scoreColor}`}>
-                        {agentData.averageScore}/10
-                      </span>
-                      <ChevronRight className="ml-2 w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
               
               <div className="text-center mt-4">
                 <Link to="/agents">

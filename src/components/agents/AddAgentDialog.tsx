@@ -7,6 +7,19 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+// Define a schema for agent validation
+const agentSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Please enter a valid email address"),
+  department: z.string().min(1, "Please select a department"),
+});
+
+type AgentFormValues = z.infer<typeof agentSchema>;
 
 interface AddAgentDialogProps {
   onAddAgent: (agent: {
@@ -18,37 +31,30 @@ interface AddAgentDialogProps {
 
 const AddAgentDialog = ({ onAddAgent }: AddAgentDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [department, setDepartment] = useState("");
   const { toast } = useToast();
+  
+  const form = useForm<AgentFormValues>({
+    resolver: zodResolver(agentSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      department: "",
+    },
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!name || !email || !department) {
-      toast({
-        title: "Error",
-        description: "Please fill in all fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const onSubmit = (values: AgentFormValues) => {
     onAddAgent({
-      name,
-      email,
-      department,
+      name: values.name,
+      email: values.email,
+      department: values.department,
     });
 
     setOpen(false);
-    setName("");
-    setEmail("");
-    setDepartment("");
+    form.reset();
 
     toast({
-      title: "Success",
-      description: "Agent added successfully",
+      title: "Agent added",
+      description: "The agent has been added successfully",
     });
   };
 
@@ -67,43 +73,64 @@ const AddAgentDialog = ({ onAddAgent }: AddAgentDialogProps) => {
             Add a new agent to the quality control system.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter agent's full name"
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Enter agent's full name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter agent's email"
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="Enter agent's email" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="department">Department</Label>
-            <Select value={department} onValueChange={setDepartment}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Customer Support">Customer Support</SelectItem>
-                <SelectItem value="Technical Support">Technical Support</SelectItem>
-                <SelectItem value="Billing Support">Billing Support</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button type="submit">Add Agent</Button>
-          </DialogFooter>
-        </form>
+            <FormField
+              control={form.control}
+              name="department"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Department</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Customer Support">Customer Support</SelectItem>
+                      <SelectItem value="Technical Support">Technical Support</SelectItem>
+                      <SelectItem value="Billing Support">Billing Support</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter className="mt-4">
+              <Button type="submit">Add Agent</Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

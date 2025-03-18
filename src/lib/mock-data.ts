@@ -1,4 +1,5 @@
-import { QualityCriteria, QualityCheck, Agent, Template, PerformanceData, ScoreBreakdown } from '@/types';
+
+import { QualityCriteria, QualityCheck, Agent, Template, PerformanceData, ScoreBreakdown, SpellCheckResult } from '@/types';
 
 // Updated criteria with new weights and removal of empathy
 export const CRITERIA: QualityCriteria[] = [
@@ -28,7 +29,8 @@ export const CRITERIA: QualityCriteria[] = [
   },
 ];
 
-export const AGENTS: Agent[] = [
+// Using let to make the array mutable for agent management
+export let AGENTS: Agent[] = [
   {
     id: 'agent-1',
     name: 'Alice Johnson',
@@ -155,15 +157,49 @@ export let QUALITY_CHECKS: QualityCheck[] = [
 
 // Create a function to store quality checks
 export const saveQualityCheck = (qualityCheck: QualityCheck) => {
-  // In a real app, this would save to a database
-  // For this mock, we'll add it to our existing array
-  QUALITY_CHECKS.unshift(qualityCheck); // Add to the beginning of the array
+  // Check if the quality check already exists
+  const existingIndex = QUALITY_CHECKS.findIndex(qc => qc.id === qualityCheck.id);
+  
+  if (existingIndex !== -1) {
+    // Update existing check
+    QUALITY_CHECKS[existingIndex] = qualityCheck;
+  } else {
+    // Add new check
+    QUALITY_CHECKS.unshift(qualityCheck); // Add to the beginning of the array
+  }
+  
   return qualityCheck;
 };
 
 // Create a function to get all quality checks
 export const getQualityChecks = (): QualityCheck[] => {
   return QUALITY_CHECKS;
+};
+
+// Add function to manage agents
+export const addAgent = (agent: Omit<Agent, 'id' | 'avatar'>): Agent => {
+  const newAgent: Agent = {
+    id: `agent-${Date.now()}`,
+    ...agent,
+    avatar: `https://i.pravatar.cc/150?img=${AGENTS.length + 1}`
+  };
+  
+  AGENTS = [...AGENTS, newAgent];
+  return newAgent;
+};
+
+export const removeAgent = (agentId: string): boolean => {
+  const initialLength = AGENTS.length;
+  AGENTS = AGENTS.filter(agent => agent.id !== agentId);
+  
+  // Also remove quality checks associated with this agent
+  QUALITY_CHECKS = QUALITY_CHECKS.filter(check => check.agentId !== agentId);
+  
+  return AGENTS.length < initialLength;
+};
+
+export const getAgent = (agentId: string): Agent | undefined => {
+  return AGENTS.find(agent => agent.id === agentId);
 };
 
 // Update the performance data function to use the stored quality checks
@@ -220,40 +256,65 @@ export const getPerformanceData = () => {
   };
 };
 
-// Helper function to check grammar with Grammarly
-export const checkGrammar = async (text: string): Promise<{
-  score: number;
-  suggestions: string[];
-}> => {
-  // In a real implementation, this would call the Grammarly API
-  // For now, we'll simulate a response
-  console.log("Checking grammar with Grammarly for:", text.substring(0, 50) + "...");
+// Helper function to check grammar with a simple spell checker
+export const checkGrammar = async (text: string): Promise<SpellCheckResult> => {
+  console.log("Checking grammar for:", text.substring(0, 50) + "...");
   
   // Simple scoring based on common errors
   let score = 10;
   const suggestions: string[] = [];
   
-  // Basic checks
-  if (text.includes("  ")) {
-    score -= 0.5;
-    suggestions.push("Avoid double spaces");
+  // Common English errors to check
+  const commonErrors = [
+    { pattern: /  /g, message: "Remove double spaces" },
+    { pattern: /\bi'm\b/gi, message: "Write 'I am' instead of 'I'm' in formal communication" },
+    { pattern: /\bdon't\b/gi, message: "Write 'do not' instead of 'don't' in formal communication" },
+    { pattern: /\bcan't\b/gi, message: "Write 'cannot' instead of 'can't' in formal communication" },
+    { pattern: /\byour welcome\b/gi, message: "Use 'you're welcome' instead of 'your welcome'" },
+    { pattern: /\btheir is\b/gi, message: "Use 'there is' instead of 'their is'" },
+    { pattern: /\bit's a\b/gi, message: "Consider using 'it is a' for more formal tone" },
+    { pattern: /\bthanks\b/gi, message: "Consider using 'thank you' for more formal tone" },
+    { pattern: /\bhey\b/gi, message: "Use a more formal greeting than 'hey'" },
+    { pattern: /!+/g, message: "Avoid excessive exclamation marks in professional emails" },
+    { pattern: /\b(?:really|very|extremely|totally)\b/gi, message: "Avoid intensifiers in professional communication" },
+    { pattern: /\b(?:awesome|amazing|fantastic|great)\b/gi, message: "Use more moderate language in professional context" },
+    { pattern: /\b(?:stuff|things)\b/gi, message: "Use more specific terminology instead of generic words" },
+    { pattern: /\blike\b/gi, message: "Avoid filler words such as 'like'" },
+    { pattern: /\bjust\b/gi, message: "The word 'just' can diminish the importance of your message" },
+  ];
+  
+  // Check for each error
+  commonErrors.forEach(error => {
+    if (text.match(error.pattern)) {
+      score -= 0.5; // Deduct points for each type of error
+      suggestions.push(error.message);
+    }
+  });
+  
+  // Check for paragraph length (readability)
+  const paragraphs = text.split(/\n\s*\n/);
+  const longParagraphs = paragraphs.filter(p => p.split(" ").length > 50);
+  if (longParagraphs.length > 0) {
+    score -= longParagraphs.length * 0.5;
+    suggestions.push("Consider breaking long paragraphs into smaller ones for better readability");
   }
   
-  if (text.toLowerCase().includes("your welcome")) {
-    score -= 1;
-    suggestions.push("Use 'you're welcome' instead of 'your welcome'");
+  // Check for sentence length
+  const sentences = text.split(/[.!?]+/);
+  const longSentences = sentences.filter(s => s.trim() !== "" && s.split(" ").length > 25);
+  if (longSentences.length > 0) {
+    score -= longSentences.length * 0.5;
+    suggestions.push("Some sentences are too long. Consider breaking them into shorter ones");
   }
   
-  if (text.toLowerCase().includes("their is")) {
-    score -= 1;
-    suggestions.push("Use 'there is' instead of 'their is'");
-  }
+  // Ensure the score is between 0 and 10
+  score = Math.max(0, Math.min(10, score));
   
-  // Simulate a slight delay to simulate API call
-  await new Promise(resolve => setTimeout(resolve, 500));
+  // Round to whole number as specified
+  score = Math.round(score);
   
   return {
-    score: Math.round(score),
-    suggestions
+    score,
+    suggestions: Array.from(new Set(suggestions)) // Remove duplicates
   };
 };
