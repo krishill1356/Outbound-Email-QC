@@ -1,7 +1,7 @@
 
 import { ScoreResult } from '@/types';
 import { ZammadEmail } from '@/services/zammadService';
-import { CRITERIA, checkGrammar } from '@/lib/mock-data';
+import { CRITERIA } from '@/lib/mock-data';
 
 // This service handles AI-based email quality assessment
 
@@ -27,7 +27,7 @@ export const analyzeEmailContent = async (email: ZammadEmail): Promise<AIScoreRe
     // Simulate AI processing time
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Check grammar with Grammarly
+    // Check grammar with our spell checker
     const grammarCheck = await checkGrammar(textContent);
     
     // Generate scores for each criteria
@@ -73,6 +73,9 @@ const stripHtmlTags = (html: string): string => {
   return doc.body.textContent || '';
 };
 
+// Import the checkGrammar function
+import { checkGrammar } from '@/services/spellCheckService';
+
 // Simulated AI scoring function based on criteria
 const simulateAIScoring = async (
   text: string, 
@@ -85,27 +88,27 @@ const simulateAIScoring = async (
   // Simple scoring rules for demonstration purposes
   switch (criteriaId) {
     case 'spelling-grammar':
-      // Use Grammarly score
+      // Use grammar check score - already more balanced
       return grammarCheck.score;
       
     case 'tone':
-      // Check for professional tone markers
+      // Check for professional tone markers - more balanced
       const professionalTerms = ['thank you', 'please', 'appreciate', 'sincerely', 'regarding', 'assist'];
-      const unprofessionalTerms = ['lol', 'yeah', 'hey', 'btw', 'cool', 'whatever', 'guys', 'cheers', 'mate'];
+      const unprofessionalTerms = ['lol', 'yeah', 'btw', 'whatever', 'guys'];
       
       let toneScore = 7; // Default professional score
       professionalTerms.forEach(term => {
-        if (textLower.includes(term)) toneScore = Math.min(10, toneScore + 1);
+        if (textLower.includes(term)) toneScore = Math.min(10, toneScore + 0.7);
       });
       
       unprofessionalTerms.forEach(term => {
-        if (textLower.includes(term)) toneScore = Math.max(1, toneScore - 2);
+        if (textLower.includes(term)) toneScore = Math.max(3, toneScore - 1.5); // Less harsh reduction
       });
       
       return Math.round(toneScore);
       
     case 'clarity':
-      // Check for clear solution presentation
+      // Check for clear solution presentation - more balanced
       const clarityPhrases = ['next steps', 'will', 'can', 'please', 'following', 'steps', 'solution'];
       let clarityScore = 7;
       
@@ -115,23 +118,23 @@ const simulateAIScoring = async (
       
       // Check for bullet points or numbered instructions
       if (text.includes('•') || /\d+\.\s/.test(text)) {
-        clarityScore = Math.min(10, clarityScore + 2);
+        clarityScore = Math.min(10, clarityScore + 1.5);
       }
       
       return Math.round(clarityScore);
       
     case 'structure':
-      // Check for standard email structure elements
-      let structureScore = 5;
+      // Check for standard email structure elements - more balanced
+      let structureScore = 6; // Start with a higher base score
       const hasGreeting = /^(dear|hello|hi|good morning|good afternoon|good evening)/i.test(textLower);
       const hasSignOff = /(regards|sincerely|thank you|best wishes|yours truly)/i.test(textLower);
       const hasHeader = text.includes('HEADER') || text.includes('TEMPLATE HEADER');
       const hasFooter = text.includes('FOOTER') || text.includes('TEMPLATE FOOTER');
       
-      if (hasGreeting) structureScore += 2;
-      if (hasSignOff) structureScore += 2;
-      if (hasHeader) structureScore += 2;
-      if (hasFooter) structureScore += 2;
+      if (hasGreeting) structureScore += 1.5;
+      if (hasSignOff) structureScore += 1.5;
+      if (hasHeader) structureScore += 1;
+      if (hasFooter) structureScore += 1;
       
       return Math.min(10, Math.round(structureScore));
       
@@ -142,19 +145,19 @@ const simulateAIScoring = async (
 
 // Generate feedback based on score and criteria
 const generateFeedback = (score: number, criteriaId: string, text: string): string => {
-  // Simplified feedback generation
+  // More moderate feedback generation
   if (score >= 9) {
-    return `Excellent performance in this area. The ${criteriaId.replace('-', ' ')} is outstanding.`;
+    return `Very good performance in this area. The ${criteriaId.replace('-', ' ')} is well done.`;
   } else if (score >= 7) {
     return `Good job on ${criteriaId.replace('-', ' ')}. Some minor improvements could be made.`;
   } else if (score >= 5) {
     return `Acceptable ${criteriaId.replace('-', ' ')}, but there's room for improvement.`;
   } else {
-    return `The ${criteriaId.replace('-', ' ')} needs significant improvement. Please review our guidelines.`;
+    return `The ${criteriaId.replace('-', ' ')} needs improvement. Please review our guidelines.`;
   }
 };
 
-// Generate overall feedback
+// Generate overall feedback - more moderate language
 const generateOverallFeedback = (overallScore: number, subject: string, text: string): string => {
   const lines = [
     `Overall assessment of response to "${subject}":`,
@@ -162,13 +165,13 @@ const generateOverallFeedback = (overallScore: number, subject: string, text: st
   ];
   
   if (overallScore >= 9) {
-    lines.push('This is an exceptional email response that effectively addresses the customer\'s needs while maintaining professionalism and clarity. The communication is well-structured and follows all best practices.');
+    lines.push('This is a very good email response that effectively addresses the customer\'s needs while maintaining professionalism and clarity. The communication is well-structured and follows best practices.');
   } else if (overallScore >= 7) {
     lines.push('This is a good email response that addresses the customer\'s concerns adequately. The communication is generally professional and clear, though there are some minor areas for improvement as noted in the specific criteria.');
   } else if (overallScore >= 5) {
     lines.push('This email response is satisfactory but could benefit from several improvements. While it addresses the basic requirements, there are notable opportunities to enhance the quality of communication.');
   } else {
-    lines.push('This email response requires significant improvement. There are several areas that do not meet our quality standards, and immediate attention is needed to address these issues.');
+    lines.push('This email response requires improvement. There are several areas that do not meet our quality standards, and attention is needed to address these issues.');
   }
   
   return lines.join('\n');
@@ -178,17 +181,18 @@ const generateOverallFeedback = (overallScore: number, subject: string, text: st
 const generateRecommendations = (scores: ScoreResult[], text: string, grammarSuggestions: string[]): string[] => {
   const recommendations: string[] = [];
   
-  // Add grammar suggestions
+  // Add grammar suggestions - but limit them
   if (grammarSuggestions.length > 0) {
-    recommendations.push(...grammarSuggestions);
+    // Add no more than 2 grammar suggestions
+    recommendations.push(...grammarSuggestions.slice(0, 2));
   }
   
   // Add recommendations based on the lowest scoring areas
   const sortedScores = [...scores].sort((a, b) => a.score - b.score);
   
-  // Focus on the lowest scoring areas
-  sortedScores.slice(0, 2).forEach(score => {
-    if (score.score < 7) {
+  // Focus on the lowest scoring areas - but only include if score is low
+  sortedScores.slice(0, 1).forEach(score => {
+    if (score.score < 6) { // Only suggest for lower scores
       switch (score.criteriaId) {
         case 'spelling-grammar':
           recommendations.push('Review response for grammatical errors and spelling mistakes before sending.');
@@ -206,8 +210,13 @@ const generateRecommendations = (scores: ScoreResult[], text: string, grammarSug
     }
   });
   
+  // Limit total recommendations
+  if (recommendations.length > 3) {
+    recommendations.splice(3);
+  }
+  
   // Add general recommendations if needed
-  if (recommendations.length === 0 && sortedScores[0].score < 9) {
+  if (recommendations.length === 0 && sortedScores[0].score < 8) {
     recommendations.push('Continue to refine your communication skills in all areas.');
   }
   
