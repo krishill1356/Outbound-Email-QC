@@ -9,7 +9,6 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AGENTS, getPerformanceData, QUALITY_CHECKS } from '@/lib/mock-data';
 import { 
   AreaChart, 
   Area, 
@@ -24,34 +23,42 @@ import {
 } from 'recharts';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { getAgents } from '@/services/agentService';
+import { getQualityChecks, getPerformanceData, CRITERIA } from '@/services/qualityCheckService';
 
 const Dashboard = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '14d' | '30d'>('7d');
-  const [performanceData, setPerformanceData] = useState(getPerformanceData());
-  const [totalReviews, setTotalReviews] = useState(QUALITY_CHECKS.length);
+  const [performanceData, setPerformanceData] = useState<any>(null);
+  const [totalReviews, setTotalReviews] = useState(0);
   const [averageScore, setAverageScore] = useState(0);
   const [lowPerformers, setLowPerformers] = useState<number>(0);
   
   // Update dashboard data when needed
   useEffect(() => {
-    // Recalculate dashboard data
-    const perfData = getPerformanceData();
-    setPerformanceData(perfData);
-    setTotalReviews(QUALITY_CHECKS.length);
+    // Get quality checks from service
+    const qualityChecks = getQualityChecks();
+    setTotalReviews(qualityChecks.length);
     
     // Calculate average score
     const avgScore = totalReviews > 0 
-      ? Math.round(QUALITY_CHECKS.reduce((sum, check) => sum + check.overallScore, 0) / totalReviews)
+      ? Math.round(qualityChecks.reduce((sum, check) => sum + check.overallScore, 0) / totalReviews)
       : 0;
     setAverageScore(avgScore);
     
+    // Get performance data from service
+    const perfData = getPerformanceData();
+    setPerformanceData(perfData);
+    
     // Calculate low performers
-    const lowPerfs = perfData.agents.filter(agent => agent.averageScore < 7);
-    setLowPerformers(lowPerfs.length);
-  }, [QUALITY_CHECKS.length]);
+    if (perfData && perfData.agents) {
+      const lowPerfs = perfData.agents.filter((agent: any) => agent.averageScore < 7);
+      setLowPerformers(lowPerfs.length);
+    }
+  }, [totalReviews]);
   
   // Filter data based on selected period
   const filterDataByPeriod = (data: any[]) => {
+    if (!data || data.length === 0) return [];
     const days = selectedPeriod === '7d' ? 7 : selectedPeriod === '14d' ? 14 : 30;
     return data.slice(-days);
   };
@@ -63,24 +70,25 @@ const Dashboard = () => {
   ];
   
   // Format chart data
-  const overallChartData = filterDataByPeriod(performanceData.overall).map(item => ({
-    date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    score: item.average
-  }));
+  const overallChartData = performanceData && performanceData.overall ? 
+    filterDataByPeriod(performanceData.overall).map((item: any) => ({
+      date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      score: item.average
+    })) : [];
   
   // Prepare criteria comparison data
-  const criteriaComparisonData = AGENTS.map(agent => {
-    const agentData = performanceData.agents.find(a => a.agent.id === agent.id);
-    if (!agentData) return null;
-    
-    return {
-      name: agent.name.split(' ')[0],
-      ...agentData.criteriaBreakdown.reduce((acc, criteria) => {
-        acc[criteria.name] = criteria.average;
-        return acc;
-      }, {} as Record<string, number>)
-    };
-  }).filter(Boolean);
+  const criteriaComparisonData = performanceData && performanceData.agents ? 
+    performanceData.agents.map((agentData: any) => {
+      if (!agentData) return null;
+
+      return {
+        name: agentData.agent.name.split(' ')[0],
+        ...agentData.criteriaBreakdown.reduce((acc: any, criteria: any) => {
+          acc[criteria.name] = criteria.average;
+          return acc;
+        }, {} as Record<string, number>)
+      };
+    }).filter(Boolean) : [];
   
   return (
     <motion.div
@@ -171,50 +179,56 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={overallChartData}
-                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="date" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#888', fontSize: 12 }}
-                  />
-                  <YAxis 
-                    domain={[0, 10]} 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#888', fontSize: 12 }}
-                    ticks={[0, 2, 4, 6, 8, 10]}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'white', 
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      border: 'none'
-                    }}
-                    formatter={(value) => [`${value}/10`, 'Score']}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="score" 
-                    stroke="#3b82f6" 
-                    strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorScore)" 
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              {overallChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={overallChartData}
+                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="date" 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#888', fontSize: 12 }}
+                    />
+                    <YAxis 
+                      domain={[0, 10]} 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#888', fontSize: 12 }}
+                      ticks={[0, 2, 4, 6, 8, 10]}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'white', 
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                        border: 'none'
+                      }}
+                      formatter={(value) => [`${value}/10`, 'Score']}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="score" 
+                      stroke="#3b82f6" 
+                      strokeWidth={2}
+                      fillOpacity={1} 
+                      fill="url(#colorScore)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <p>No data available yet. Complete some quality checks to see performance trends.</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -228,22 +242,28 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={criteriaComparisonData}
-                  margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis dataKey="name" scale="band" axisLine={false} tickLine={false} />
-                  <YAxis domain={[0, 10]} axisLine={false} tickLine={false} ticks={[0, 2, 4, 6, 8, 10]} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="Spelling & Grammar" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Tone" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Clarity" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Structure" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {criteriaComparisonData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={criteriaComparisonData}
+                    margin={{ top: 20, right: 30, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                    <XAxis dataKey="name" scale="band" axisLine={false} tickLine={false} />
+                    <YAxis domain={[0, 10]} axisLine={false} tickLine={false} ticks={[0, 2, 4, 6, 8, 10]} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="Spelling & Grammar" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Tone" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Clarity" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Structure" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <p>No data available yet. Complete some quality checks to see criteria comparison.</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -255,15 +275,8 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {performanceData.agents.length === 0 ? (
-                <div className="p-4 text-center">
-                  <p className="text-muted-foreground">No agents data available</p>
-                  <Link to="/agents" className="mt-2 inline-block">
-                    <Button variant="outline" size="sm">Add Agents</Button>
-                  </Link>
-                </div>
-              ) : (
-                performanceData.agents.map((agentData) => {
+              {performanceData && performanceData.agents && performanceData.agents.length > 0 ? (
+                performanceData.agents.map((agentData: any) => {
                   const scoreColor = 
                     agentData.averageScore >= 8 ? 'text-green-500' :
                     agentData.averageScore >= 6 ? 'text-amber-500' :
@@ -293,6 +306,13 @@ const Dashboard = () => {
                     </div>
                   );
                 })
+              ) : (
+                <div className="p-4 text-center">
+                  <p className="text-muted-foreground">No agents data available</p>
+                  <Link to="/agents" className="mt-2 inline-block">
+                    <Button variant="outline" size="sm">Add Agents</Button>
+                  </Link>
+                </div>
               )}
               
               <div className="text-center mt-4">

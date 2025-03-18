@@ -43,24 +43,35 @@ import {
   Radar
 } from 'recharts';
 import { motion } from 'framer-motion';
-import { getPerformanceData, AGENTS, CRITERIA, getQualityChecks } from '@/lib/mock-data';
 import { QualityCheck } from '@/types';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
+import { getAgents } from '@/services/agentService';
+import { getQualityChecks, getPerformanceData, CRITERIA } from '@/services/qualityCheckService';
 
 const Reports = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '14d' | '30d'>('30d');
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
+  const [agents, setAgents] = useState<any[]>([]);
   const [qualityChecks, setQualityChecks] = useState<QualityCheck[]>([]);
   const [filteredChecks, setFilteredChecks] = useState<QualityCheck[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [performanceData, setPerformanceData] = useState<any>(null);
   
   useEffect(() => {
+    // Load agents and quality checks
+    const agentsList = getAgents();
+    setAgents(agentsList);
+    
     // Load quality checks
     const checks = getQualityChecks();
     setQualityChecks(checks);
     setFilteredChecks(checks);
+    
+    // Load performance data
+    const perfData = getPerformanceData();
+    setPerformanceData(perfData);
   }, []);
   
   useEffect(() => {
@@ -83,25 +94,26 @@ const Reports = () => {
     setFilteredChecks(filtered);
   }, [selectedAgent, searchQuery, qualityChecks]);
   
-  const performanceData = getPerformanceData();
   const daysToShow = selectedPeriod === '7d' ? 7 : selectedPeriod === '14d' ? 14 : 30;
   
   // Format trend data based on selected period and agent
   const getTrendData = () => {
+    if (!performanceData) return [];
+    
     if (selectedAgent === 'all') {
-      return performanceData.overall
+      return (performanceData.overall || [])
         .slice(-daysToShow)
-        .map(item => ({
+        .map((item: any) => ({
           date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           score: item.average
         }));
     } else {
-      const agentData = performanceData.agents.find(a => a.agent.id === selectedAgent);
+      const agentData = (performanceData.agents || []).find((a: any) => a.agent.id === selectedAgent);
       if (!agentData) return [];
       
       return agentData.trend
         .slice(-daysToShow)
-        .map(item => ({
+        .map((item: any) => ({
           date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           score: item.score
         }));
@@ -110,15 +122,17 @@ const Reports = () => {
   
   // Get criteria breakdown for selected agent or overall
   const getCriteriaBreakdown = () => {
+    if (!performanceData) return [];
+    
     if (selectedAgent === 'all') {
       // Average all agent scores per criteria
       return CRITERIA.map(criteria => {
-        const allScores = performanceData.agents.flatMap(agent => 
-          agent.criteriaBreakdown.filter(c => c.criteriaId === criteria.id)
+        const allScores = (performanceData.agents || []).flatMap((agent: any) => 
+          agent.criteriaBreakdown.filter((c: any) => c.criteriaId === criteria.id)
         );
         
         const average = allScores.length 
-          ? Number((allScores.reduce((sum, item) => sum + item.average, 0) / allScores.length).toFixed(0))
+          ? Number((allScores.reduce((sum: number, item: any) => sum + item.average, 0) / allScores.length).toFixed(0))
           : 0;
           
         return {
@@ -128,10 +142,10 @@ const Reports = () => {
         };
       });
     } else {
-      const agentData = performanceData.agents.find(a => a.agent.id === selectedAgent);
+      const agentData = (performanceData.agents || []).find((a: any) => a.agent.id === selectedAgent);
       if (!agentData) return [];
       
-      return agentData.criteriaBreakdown.map(c => ({
+      return agentData.criteriaBreakdown.map((c: any) => ({
         name: c.name,
         score: Math.round(c.average),
         fullMark: 10
@@ -162,6 +176,8 @@ const Reports = () => {
   
   // Get agent comparison data
   const getAgentComparison = () => {
+    if (!qualityChecks.length) return [];
+    
     // Group quality checks by agent
     const agentGroups = qualityChecks.reduce((groups, check) => {
       if (!groups[check.agentName]) {
@@ -188,7 +204,7 @@ const Reports = () => {
       return <Badge variant="outline" className="ml-2">All Agents</Badge>;
     }
     
-    const agent = AGENTS.find(a => a.id === selectedAgent);
+    const agent = agents.find(a => a.id === selectedAgent);
     if (!agent) return null;
     
     return <Badge variant="outline" className="ml-2">{agent.name}</Badge>;
@@ -232,7 +248,7 @@ const Reports = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Agents</SelectItem>
-                {AGENTS.map(agent => (
+                {agents.map(agent => (
                   <SelectItem key={agent.id} value={agent.id}>
                     {agent.name}
                   </SelectItem>
@@ -269,49 +285,55 @@ const Reports = () => {
               </CardHeader>
               <CardContent>
                 <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={trendData}
-                      margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                    >
-                      <defs>
-                        <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="date" 
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: '#888', fontSize: 12 }}
-                      />
-                      <YAxis 
-                        domain={[0, 10]} 
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: '#888', fontSize: 12 }}
-                      />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'white', 
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                          border: 'none'
-                        }}
-                        formatter={(value) => [`${value}/10`, 'Score']}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="score" 
-                        stroke="#3b82f6" 
-                        strokeWidth={2}
-                        fillOpacity={1} 
-                        fill="url(#colorScore)" 
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  {trendData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart
+                        data={trendData}
+                        margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                      >
+                        <defs>
+                          <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis 
+                          dataKey="date" 
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#888', fontSize: 12 }}
+                        />
+                        <YAxis 
+                          domain={[0, 10]} 
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#888', fontSize: 12 }}
+                        />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: 'white', 
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                            border: 'none'
+                          }}
+                          formatter={(value) => [`${value}/10`, 'Score']}
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="score" 
+                          stroke="#3b82f6" 
+                          strokeWidth={2}
+                          fillOpacity={1} 
+                          fill="url(#colorScore)" 
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      <p>No data available yet. Complete some quality checks to see performance trends.</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -327,21 +349,27 @@ const Reports = () => {
               </CardHeader>
               <CardContent>
                 <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart outerRadius={90} data={criteriaData}>
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="name" tick={{ fill: '#888', fontSize: 12 }} />
-                      <PolarRadiusAxis angle={30} domain={[0, 10]} />
-                      <Radar
-                        name="Score"
-                        dataKey="score"
-                        stroke="#3b82f6"
-                        fill="#3b82f6"
-                        fillOpacity={0.6}
-                      />
-                      <Tooltip />
-                    </RadarChart>
-                  </ResponsiveContainer>
+                  {criteriaData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart outerRadius={90} data={criteriaData}>
+                        <PolarGrid />
+                        <PolarAngleAxis dataKey="name" tick={{ fill: '#888', fontSize: 12 }} />
+                        <PolarRadiusAxis angle={30} domain={[0, 10]} />
+                        <Radar
+                          name="Score"
+                          dataKey="score"
+                          stroke="#3b82f6"
+                          fill="#3b82f6"
+                          fillOpacity={0.6}
+                        />
+                        <Tooltip />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      <p>No data available yet. Complete some quality checks to see criteria breakdown.</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -355,34 +383,40 @@ const Reports = () => {
               </CardHeader>
               <CardContent>
                 <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={distributionData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={90}
-                        paddingAngle={5}
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                        labelLine={false}
-                      >
-                        {distributionData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        formatter={(value) => [value, 'Count']}
-                        contentStyle={{ 
-                          backgroundColor: 'white', 
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                          border: 'none'
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                  {filteredChecks.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={distributionData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={90}
+                          paddingAngle={5}
+                          dataKey="value"
+                          label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                          labelLine={false}
+                        >
+                          {distributionData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value) => [value, 'Count']}
+                          contentStyle={{ 
+                            backgroundColor: 'white', 
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                            border: 'none'
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      <p>No data available yet. Complete some quality checks to see score distribution.</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -396,40 +430,46 @@ const Reports = () => {
               </CardHeader>
               <CardContent>
                 <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={agentComparisonData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" scale="band" axisLine={false} tickLine={false} />
-                      <YAxis yAxisId="left" orientation="left" domain={[0, 10]} axisLine={false} tickLine={false} />
-                      <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} />
-                      <Tooltip
-                        contentStyle={{ 
-                          backgroundColor: 'white', 
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                          border: 'none'
-                        }}
-                      />
-                      <Legend />
-                      <Bar 
-                        yAxisId="left" 
-                        dataKey="score" 
-                        name="Avg. Score" 
-                        fill="#3b82f6"
-                        radius={[4, 4, 0, 0]}
-                      />
-                      <Bar 
-                        yAxisId="right" 
-                        dataKey="checks" 
-                        name="Reviews Count" 
-                        fill="#10b981"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {agentComparisonData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={agentComparisonData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" scale="band" axisLine={false} tickLine={false} />
+                        <YAxis yAxisId="left" orientation="left" domain={[0, 10]} axisLine={false} tickLine={false} />
+                        <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} />
+                        <Tooltip
+                          contentStyle={{ 
+                            backgroundColor: 'white', 
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                            border: 'none'
+                          }}
+                        />
+                        <Legend />
+                        <Bar 
+                          yAxisId="left" 
+                          dataKey="score" 
+                          name="Avg. Score" 
+                          fill="#3b82f6"
+                          radius={[4, 4, 0, 0]}
+                        />
+                        <Bar 
+                          yAxisId="right" 
+                          dataKey="checks" 
+                          name="Reviews Count" 
+                          fill="#10b981"
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      <p>No data available yet. Complete some quality checks to see agent comparison.</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
