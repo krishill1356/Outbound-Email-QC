@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -24,14 +25,17 @@ import QCScoreForm from '@/components/quality/QCScoreForm';
 import { ZammadEmail, fetchEmails, getZammadSettings, fetchAgents } from '@/services/zammadService';
 import { analyzeEmailContent } from '@/services/aiScoringService';
 import { analyzeEmailTemplate } from '@/services/templateAnalysisService';
-import { ScoreResult } from '@/types';
+import { ScoreResult, QualityCheck } from '@/types';
 import { format, subDays } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import EmailContentInput from '@/components/quality/EmailContentInput';
+import { saveQualityCheck } from '@/lib/mock-data';
+import { useNavigate } from 'react-router-dom';
 
-const QualityCheck = () => {
+const QualityCheckPage = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [emails, setEmails] = useState<ZammadEmail[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<ZammadEmail | null>(null);
@@ -42,14 +46,14 @@ const QualityCheck = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredEmails, setFilteredEmails] = useState<ZammadEmail[]>([]);
   const [zammadConfigured, setZammadConfigured] = useState(false);
-  const [activeTab, setActiveTab] = useState('zammad');
+  const [activeTab, setActiveTab] = useState('paste');
   const [templateAnalysis, setTemplateAnalysis] = useState<{
     detectedTemplate?: string;
     missingComponents?: string[];
     prohibitedPhrases?: string[];
   } | undefined>(undefined);
   
-  // New state for AI analysis results
+  // State for AI analysis results
   const [aiAnalysisResults, setAiAnalysisResults] = useState<{
     scores: ScoreResult[];
     generalFeedback: string;
@@ -214,28 +218,54 @@ const QualityCheck = () => {
     
     setIsSubmittingQC(true);
     
-    // In a real implementation, this would save to a database
-    // For now, just simulate the API call
-    setTimeout(() => {
-      setIsSubmittingQC(false);
+    try {
+      // Calculate overall score using the weights from criteria
+      const overallScore = Math.round(scores.reduce((total, score) => {
+        const criteria = scores.find(s => s.criteriaId === score.criteriaId);
+        return total + (score.score * 0.25); // Equal 25% weight for all criteria
+      }, 0));
+      
+      // Create new quality check record
+      const newQualityCheck: QualityCheck = {
+        id: `qc-${Date.now()}`,
+        agentId: selectedEmail.agentId || 'unknown',
+        agentName: agentName,
+        emailId: selectedEmail.id,
+        emailSubject: selectedEmail.subject,
+        reviewerId: 'current-user', // In a real app, this would be the current user's ID
+        date: new Date().toISOString(),
+        emailContent: selectedEmail.body,
+        scores: scores,
+        overallScore: overallScore,
+        feedback: feedback,
+        recommendations: recommendations,
+        status: 'completed'
+      };
+      
+      // Save the quality check
+      saveQualityCheck(newQualityCheck);
+      
       toast({
         title: "Quality Check Saved",
-        description: `Assessment for ${agentName}'s email (ticket #${selectedEmail.ticketNumber}) has been saved successfully.`,
+        description: `Assessment for ${agentName}'s email has been saved successfully.`,
       });
       
+      // Navigate to reports page to show the saved assessment
+      setTimeout(() => {
+        navigate('/reports');
+      }, 1500);
+    } catch (error) {
+      console.error('Error saving quality check:', error);
+      toast({
+        title: "Error Saving Assessment",
+        description: "Failed to save the quality assessment. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmittingQC(false);
       // Clear selection to allow for next assessment
       setSelectedEmail(null);
-    }, 1000);
-    
-    console.log('QC Submission:', { 
-      emailId: selectedEmail.id,
-      ticketId: selectedEmail.ticketId,
-      agentId: selectedEmail.agentId,
-      agentName: selectedEmail.agentName, // Include agent name for reporting
-      scores, 
-      feedback, 
-      recommendations 
-    });
+    }
   };
 
   const handleAutoScore = async (email: ZammadEmail) => {
@@ -293,7 +323,6 @@ const QualityCheck = () => {
     };
 
     setSelectedEmail(pastedEmail);
-    
     // Analyze the template and content automatically
     // The useEffect will trigger the analysis
   };
@@ -334,7 +363,7 @@ const QualityCheck = () => {
                 <Button 
                   variant="outline" 
                   className="ml-2"
-                  onClick={() => window.location.href = '/settings'}
+                  onClick={() => navigate('/settings')}
                 >
                   Go to Settings
                 </Button>
@@ -480,4 +509,4 @@ const QualityCheck = () => {
   );
 };
 
-export default QualityCheck;
+export default QualityCheckPage;

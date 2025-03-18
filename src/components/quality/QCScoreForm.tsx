@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,15 +9,8 @@ import { Slider } from '@/components/ui/slider';
 import { CRITERIA } from '@/lib/mock-data';
 import { Separator } from '@/components/ui/separator';
 import { ScoreResult } from '@/types';
-import { Save, Loader2, Wand2, AlertCircle, Check, X, User } from 'lucide-react';
+import { Save, Loader2, Wand2, Check, X, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
 
 interface QCScoreFormProps {
   onSubmit: (scores: ScoreResult[], feedback: string, recommendations: string[], agentName: string) => void;
@@ -33,7 +27,6 @@ interface QCScoreFormProps {
       prohibitedPhrases?: string[];
     };
   }>;
-  onTemplateChange?: (template: string) => void;
   initialData?: {
     scores: ScoreResult[];
     generalFeedback: string;
@@ -42,19 +35,12 @@ interface QCScoreFormProps {
   isAnalyzing?: boolean;
 }
 
-const EMAIL_TEMPLATES = [
-  { id: 'air_travel_claim', name: 'Air Travel Claim' },
-  { id: 'my_law_matters', name: 'My Law Matters' },
-  { id: 'general', name: 'General Response' }
-];
-
 const QCScoreForm: React.FC<QCScoreFormProps> = ({ 
   onSubmit, 
   isSubmitting, 
   disabled = false,
   email = null,
   onAutoScore,
-  onTemplateChange,
   initialData,
   isAnalyzing = false
 }) => {
@@ -69,7 +55,6 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
   const [recommendations, setRecommendations] = useState<string[]>(['']);
   const [isAutoScoring, setIsAutoScoring] = useState(false);
   const [aiAssisted, setAiAssisted] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState('');
 
   // Load initial data when it becomes available
   useEffect(() => {
@@ -97,14 +82,13 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
       setGeneralFeedback('');
       setRecommendations(['']);
       setAiAssisted(false);
-      setSelectedTemplate('');
     }
   }, [email]);
 
   const handleScoreChange = (criteriaId: string, score: number) => {
     setScores(prev => 
       prev.map(item => 
-        item.criteriaId === criteriaId ? { ...item, score } : item
+        item.criteriaId === criteriaId ? { ...item, score: Math.round(score) } : item
       )
     );
   };
@@ -136,13 +120,6 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
     onSubmit(scores, generalFeedback, filteredRecommendations, email?.agentName || 'Unknown Agent');
   };
 
-  const handleTemplateChange = (template: string) => {
-    setSelectedTemplate(template);
-    if (onTemplateChange) {
-      onTemplateChange(template);
-    }
-  };
-
   const handleAutoScore = async () => {
     if (!email || !onAutoScore) return;
     
@@ -159,14 +136,6 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
         setRecommendations(result.recommendations);
       }
       
-      // Set detected template if available
-      if (result.templateAnalysis?.detectedTemplate) {
-        setSelectedTemplate(result.templateAnalysis.detectedTemplate);
-        if (onTemplateChange) {
-          onTemplateChange(result.templateAnalysis.detectedTemplate);
-        }
-      }
-      
       setAiAssisted(true);
     } catch (error) {
       console.error('Auto-scoring failed:', error);
@@ -175,11 +144,10 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
     }
   };
 
-  // Calculate overall score as weighted average
-  const overallScore = scores.reduce((total, score) => {
-    const criteria = CRITERIA.find(c => c.id === score.criteriaId);
-    return total + (score.score * (criteria?.weight || 0.2));
-  }, 0).toFixed(1);
+  // Calculate overall score as weighted average (all criteria have equal 25% weight)
+  const overallScore = Math.round(scores.reduce((total, score) => {
+    return total + (score.score * 0.25); // Equal 25% weight for all criteria
+  }, 0));
 
   return (
     <Card className="h-full">
@@ -205,28 +173,6 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
           <div className="flex items-center justify-center py-4">
             <Loader2 className="h-6 w-6 animate-spin mr-2" />
             <span>Analyzing email content...</span>
-          </div>
-        )}
-        
-        {email && (
-          <div className="space-y-2">
-            <Label htmlFor="template-select">Email Template</Label>
-            <Select 
-              value={selectedTemplate} 
-              onValueChange={handleTemplateChange}
-              disabled={disabled || isSubmitting}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select template" />
-              </SelectTrigger>
-              <SelectContent>
-                {EMAIL_TEMPLATES.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>
-                    {template.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         )}
         
@@ -256,7 +202,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
           <div key={criteria.id} className="space-y-2">
             <div className="flex justify-between items-center">
               <Label htmlFor={`score-${criteria.id}`} className="font-medium">
-                {criteria.name}
+                {criteria.name} (25%)
               </Label>
               <span className="text-xl font-bold">
                 {scores.find(s => s.criteriaId === criteria.id)?.score || 0}/10

@@ -1,4 +1,3 @@
-
 export interface QualityCriteria {
   id: string;
   name: string;
@@ -15,11 +14,12 @@ export interface ScoreResult {
 export interface QualityCheck {
   id: string;
   agentId: string;
+  agentName: string;
   emailId: string;
+  emailSubject: string;
   reviewerId: string;
   date: string;
   emailContent: string;
-  templateUsed: string;
   scores: ScoreResult[];
   overallScore: number;
   feedback: string;

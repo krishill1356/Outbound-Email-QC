@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
@@ -17,7 +17,10 @@ import {
   Users, 
   Calendar,
   ChevronDown,
-  Download
+  Download,
+  Search,
+  FileText,
+  Clock
 } from 'lucide-react';
 import {
   AreaChart, 
@@ -40,11 +43,45 @@ import {
   Radar
 } from 'recharts';
 import { motion } from 'framer-motion';
-import { getPerformanceData, AGENTS, CRITERIA } from '@/lib/mock-data';
+import { getPerformanceData, AGENTS, CRITERIA, getQualityChecks } from '@/lib/mock-data';
+import { QualityCheck } from '@/types';
+import { Input } from '@/components/ui/input';
+import { format } from 'date-fns';
 
 const Reports = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '14d' | '30d'>('30d');
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
+  const [qualityChecks, setQualityChecks] = useState<QualityCheck[]>([]);
+  const [filteredChecks, setFilteredChecks] = useState<QualityCheck[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('overview');
+  
+  useEffect(() => {
+    // Load quality checks
+    const checks = getQualityChecks();
+    setQualityChecks(checks);
+    setFilteredChecks(checks);
+  }, []);
+  
+  useEffect(() => {
+    let filtered = qualityChecks;
+    
+    // Filter by agent if selected
+    if (selectedAgent !== 'all') {
+      filtered = filtered.filter(check => check.agentId === selectedAgent);
+    }
+    
+    // Filter by search query if any
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(check => 
+        check.agentName.toLowerCase().includes(query) ||
+        check.emailSubject.toLowerCase().includes(query)
+      );
+    }
+    
+    setFilteredChecks(filtered);
+  }, [selectedAgent, searchQuery, qualityChecks]);
   
   const performanceData = getPerformanceData();
   const daysToShow = selectedPeriod === '7d' ? 7 : selectedPeriod === '14d' ? 14 : 30;
@@ -81,7 +118,7 @@ const Reports = () => {
         );
         
         const average = allScores.length 
-          ? Number((allScores.reduce((sum, item) => sum + item.average, 0) / allScores.length).toFixed(1))
+          ? Number((allScores.reduce((sum, item) => sum + item.average, 0) / allScores.length).toFixed(0))
           : 0;
           
         return {
@@ -96,7 +133,7 @@ const Reports = () => {
       
       return agentData.criteriaBreakdown.map(c => ({
         name: c.name,
-        score: c.average,
+        score: Math.round(c.average),
         fullMark: 10
       }));
     }
@@ -106,25 +143,14 @@ const Reports = () => {
   const getScoreDistribution = () => {
     const distribution = [
       { name: 'Excellent (8-10)', value: 0, color: '#10b981' },
-      { name: 'Good (6-7.9)', value: 0, color: '#f59e0b' },
-      { name: 'Needs Improvement (0-5.9)', value: 0, color: '#ef4444' }
+      { name: 'Good (6-7)', value: 0, color: '#f59e0b' },
+      { name: 'Needs Improvement (0-5)', value: 0, color: '#ef4444' }
     ];
     
-    let scores = [];
-    
-    if (selectedAgent === 'all') {
-      scores = performanceData.agents.map(a => a.averageScore);
-    } else {
-      const agentData = performanceData.agents.find(a => a.agent.id === selectedAgent);
-      if (agentData) {
-        scores = [agentData.averageScore];
-      }
-    }
-    
-    scores.forEach(score => {
-      if (score >= 8) {
+    filteredChecks.forEach(check => {
+      if (check.overallScore >= 8) {
         distribution[0].value++;
-      } else if (score >= 6) {
+      } else if (check.overallScore >= 6) {
         distribution[1].value++;
       } else {
         distribution[2].value++;
@@ -136,10 +162,24 @@ const Reports = () => {
   
   // Get agent comparison data
   const getAgentComparison = () => {
-    return performanceData.agents.map(agent => ({
-      name: agent.agent.name.split(' ')[0],
-      score: agent.averageScore,
-      checks: agent.checksCount
+    // Group quality checks by agent
+    const agentGroups = qualityChecks.reduce((groups, check) => {
+      if (!groups[check.agentName]) {
+        groups[check.agentName] = {
+          checks: [],
+          totalScore: 0
+        };
+      }
+      groups[check.agentName].checks.push(check);
+      groups[check.agentName].totalScore += check.overallScore;
+      return groups;
+    }, {} as Record<string, { checks: QualityCheck[], totalScore: number }>);
+    
+    // Calculate average scores
+    return Object.entries(agentGroups).map(([name, data]) => ({
+      name: name.split(' ')[0], // First name only for chart readability
+      score: Math.round(data.totalScore / data.checks.length), // Average score without decimals
+      checks: data.checks.length // Total checks count
     }));
   };
   
@@ -200,7 +240,7 @@ const Reports = () => {
               </SelectContent>
             </Select>
             
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => window.print()}>
               <Download className="mr-2 h-4 w-4" />
               Export
             </Button>
@@ -208,185 +248,272 @@ const Reports = () => {
         </div>
       </section>
       
-      <section className="mb-8">
-        <Card className="glass-card">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-xl">Performance Trend</CardTitle>
-                <CardDescription>
-                  Email quality scores over time {renderAgentBadge()}
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={trendData}
-                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis 
-                    dataKey="date" 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#888', fontSize: 12 }}
-                  />
-                  <YAxis 
-                    domain={[0, 10]} 
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#888', fontSize: 12 }}
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'white', 
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      border: 'none'
-                    }}
-                    formatter={(value) => [`${value}/10`, 'Score']}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="score" 
-                    stroke="#3b82f6" 
-                    strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorScore)" 
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-      
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="text-xl">Criteria Breakdown</CardTitle>
-            <CardDescription>
-              Performance by evaluation criteria {renderAgentBadge()}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart outerRadius={90} data={criteriaData}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="name" tick={{ fill: '#888', fontSize: 12 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 10]} />
-                  <Radar
-                    name="Score"
-                    dataKey="score"
-                    stroke="#3b82f6"
-                    fill="#3b82f6"
-                    fillOpacity={0.6}
-                  />
-                  <Tooltip />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="recent">Recent Assessments</TabsTrigger>
+        </TabsList>
         
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="text-xl">Score Distribution</CardTitle>
-            <CardDescription>
-              Distribution of quality scores {renderAgentBadge()}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={distributionData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={5}
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                    labelLine={false}
-                  >
-                    {distributionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+        <TabsContent value="overview">
+          <section className="mb-8">
+            <Card className="glass-card">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl">Performance Trend</CardTitle>
+                    <CardDescription>
+                      Email quality scores over time {renderAgentBadge()}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={trendData}
+                      margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="date" 
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#888', fontSize: 12 }}
+                      />
+                      <YAxis 
+                        domain={[0, 10]} 
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#888', fontSize: 12 }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'white', 
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                          border: 'none'
+                        }}
+                        formatter={(value) => [`${value}/10`, 'Score']}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="score" 
+                        stroke="#3b82f6" 
+                        strokeWidth={2}
+                        fillOpacity={1} 
+                        fill="url(#colorScore)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+          
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-xl">Criteria Breakdown</CardTitle>
+                <CardDescription>
+                  Performance by evaluation criteria {renderAgentBadge()}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart outerRadius={90} data={criteriaData}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="name" tick={{ fill: '#888', fontSize: 12 }} />
+                      <PolarRadiusAxis angle={30} domain={[0, 10]} />
+                      <Radar
+                        name="Score"
+                        dataKey="score"
+                        stroke="#3b82f6"
+                        fill="#3b82f6"
+                        fillOpacity={0.6}
+                      />
+                      <Tooltip />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-xl">Score Distribution</CardTitle>
+                <CardDescription>
+                  Distribution of quality scores {renderAgentBadge()}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={distributionData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={5}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                        labelLine={false}
+                      >
+                        {distributionData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value) => [value, 'Count']}
+                        contentStyle={{ 
+                          backgroundColor: 'white', 
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                          border: 'none'
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+          
+          <section className="mb-8">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-xl">Agent Comparison</CardTitle>
+                <CardDescription>Average score comparison across all agents</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={agentComparisonData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" scale="band" axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="left" orientation="left" domain={[0, 10]} axisLine={false} tickLine={false} />
+                      <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} />
+                      <Tooltip
+                        contentStyle={{ 
+                          backgroundColor: 'white', 
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                          border: 'none'
+                        }}
+                      />
+                      <Legend />
+                      <Bar 
+                        yAxisId="left" 
+                        dataKey="score" 
+                        name="Avg. Score" 
+                        fill="#3b82f6"
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar 
+                        yAxisId="right" 
+                        dataKey="checks" 
+                        name="Reviews Count" 
+                        fill="#10b981"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        </TabsContent>
+        
+        <TabsContent value="recent">
+          <section className="mb-8">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-xl">Recent Quality Assessments</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="search"
+                        placeholder="Search by agent or subject..."
+                        className="pl-8 w-[200px] md:w-[300px]"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {filteredChecks.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <FileText className="mx-auto h-12 w-12 opacity-20 mb-4" />
+                    <p>No quality assessments found.</p>
+                    <p className="text-sm mt-2">Complete some quality checks to see them here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredChecks.map((check) => (
+                      <Card key={check.id} className="overflow-hidden">
+                        <div className="flex flex-col md:flex-row md:items-center">
+                          <div className="p-4 md:p-6 flex-1">
+                            <div className="flex items-center justify-between mb-2">
+                              <h3 className="font-medium text-base">
+                                {check.emailSubject}
+                              </h3>
+                              <Badge>{check.overallScore}/10</Badge>
+                            </div>
+                            <div className="flex flex-col md:flex-row md:items-center text-sm text-muted-foreground gap-y-1 md:gap-x-4">
+                              <div className="flex items-center">
+                                <Users className="h-3.5 w-3.5 mr-1" />
+                                {check.agentName}
+                              </div>
+                              <div className="flex items-center">
+                                <Clock className="h-3.5 w-3.5 mr-1" />
+                                {format(new Date(check.date), 'PPP')}
+                              </div>
+                            </div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {check.scores.map((score) => {
+                                const criteria = CRITERIA.find(c => c.id === score.criteriaId);
+                                let color = '';
+                                if (score.score >= 8) color = 'bg-green-100 text-green-700';
+                                else if (score.score >= 6) color = 'bg-amber-100 text-amber-700';
+                                else color = 'bg-red-100 text-red-700';
+                                
+                                return (
+                                  <div 
+                                    key={score.criteriaId} 
+                                    className={`text-xs px-2 py-1 rounded-full ${color}`}
+                                  >
+                                    {criteria?.name}: {score.score}/10
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
                     ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value) => [value, 'Count']}
-                    contentStyle={{ 
-                      backgroundColor: 'white', 
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      border: 'none'
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-      
-      <section className="mb-8">
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="text-xl">Agent Comparison</CardTitle>
-            <CardDescription>Average score comparison across all agents</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={agentComparisonData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" scale="band" axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="left" orientation="left" domain={[0, 10]} axisLine={false} tickLine={false} />
-                  <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ 
-                      backgroundColor: 'white', 
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      border: 'none'
-                    }}
-                  />
-                  <Legend />
-                  <Bar 
-                    yAxisId="left" 
-                    dataKey="score" 
-                    name="Avg. Score" 
-                    fill="#3b82f6"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar 
-                    yAxisId="right" 
-                    dataKey="checks" 
-                    name="Reviews Count" 
-                    fill="#10b981"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </section>
+        </TabsContent>
+      </Tabs>
     </motion.div>
   );
 };

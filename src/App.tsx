@@ -8,7 +8,6 @@ import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import QualityCheck from "./pages/QualityCheck";
 import Reports from "./pages/Reports";
-import Templates from "./pages/Templates";
 import Agents from "./pages/Agents";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -26,7 +25,6 @@ const App = () => (
             <Route index element={<Dashboard />} />
             <Route path="quality-check" element={<QualityCheck />} />
             <Route path="reports" element={<Reports />} />
-            <Route path="templates" element={<Templates />} />
             <Route path="agents" element={<Agents />} />
             <Route path="settings" element={<Settings />} />
           </Route>
