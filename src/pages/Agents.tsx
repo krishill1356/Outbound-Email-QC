@@ -38,11 +38,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import AddAgentDialog from '@/components/agents/AddAgentDialog';
-import { AGENTS, getPerformanceData, addAgent, removeAgent } from '@/lib/mock-data';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 import { Agent } from '@/types';
+import { getAgents, removeAgent } from '@/services/agentService';
+import { getPerformanceData } from '@/services/qualityCheckService';
 
 const Agents = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,17 +53,17 @@ const Agents = () => {
   
   // Load agents on component mount
   useEffect(() => {
-    setAgents(AGENTS);
+    loadAgents();
   }, []);
   
-  // Update performance data when agents change
-  useEffect(() => {
+  const loadAgents = () => {
+    setAgents(getAgents());
     setPerformanceData(getPerformanceData());
-  }, [agents]);
+  };
   
   // Find agent performance data and merge with agent data
   const agentsWithPerformance = agents.map(agent => {
-    const performance = performanceData.agents.find(a => a.agent.id === agent.id);
+    const performance = performanceData.agents.find(a => a.agent?.id === agent.id);
     return {
       ...agent,
       performance: performance ? {
@@ -79,15 +80,10 @@ const Agents = () => {
     agent.department.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleAddAgent = (newAgent: { name: string; email: string; department: string }) => {
-    const addedAgent = addAgent(newAgent);
-    setAgents(prevAgents => [...prevAgents, addedAgent]);
-  };
-
   const handleRemoveAgent = (agentId: string) => {
     const wasRemoved = removeAgent(agentId);
     if (wasRemoved) {
-      setAgents(prevAgents => prevAgents.filter(agent => agent.id !== agentId));
+      loadAgents();
       toast({
         title: "Agent Removed",
         description: "The agent has been removed successfully",
@@ -131,7 +127,7 @@ const Agents = () => {
               Filter
             </Button>
             
-            <AddAgentDialog onAddAgent={handleAddAgent} />
+            <AddAgentDialog onAgentAdded={loadAgents} />
           </div>
         </div>
       </section>
@@ -151,7 +147,7 @@ const Agents = () => {
               <p className="text-muted-foreground mt-1 mb-4">
                 There are no agents in the system yet. Add your first agent to get started.
               </p>
-              <AddAgentDialog onAddAgent={handleAddAgent} />
+              <AddAgentDialog onAgentAdded={loadAgents} />
             </div>
           ) : (
             <div className="rounded-md border">

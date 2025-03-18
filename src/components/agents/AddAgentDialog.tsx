@@ -3,14 +3,14 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { addAgent } from "@/services/agentService";
 
 // Define a schema for agent validation
 const agentSchema = z.object({
@@ -22,14 +22,10 @@ const agentSchema = z.object({
 type AgentFormValues = z.infer<typeof agentSchema>;
 
 interface AddAgentDialogProps {
-  onAddAgent: (agent: {
-    name: string;
-    email: string;
-    department: string;
-  }) => void;
+  onAgentAdded: () => void;
 }
 
-const AddAgentDialog = ({ onAddAgent }: AddAgentDialogProps) => {
+const AddAgentDialog = ({ onAgentAdded }: AddAgentDialogProps) => {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   
@@ -43,7 +39,7 @@ const AddAgentDialog = ({ onAddAgent }: AddAgentDialogProps) => {
   });
 
   const onSubmit = (values: AgentFormValues) => {
-    onAddAgent({
+    addAgent({
       name: values.name,
       email: values.email,
       department: values.department,
@@ -51,6 +47,7 @@ const AddAgentDialog = ({ onAddAgent }: AddAgentDialogProps) => {
 
     setOpen(false);
     form.reset();
+    onAgentAdded();
 
     toast({
       title: "Agent added",
