@@ -1,6 +1,7 @@
+
 import { ScoreResult, QualityCriteria } from '@/types';
 import { analyzeEmailStructure, CRITERIA } from './qualityCheckService';
-import { checkSpellingAndGrammar } from './spellCheckService';
+import { checkGrammar } from './spellCheckService';
 
 /**
  * Simulate AI analysis of email content
@@ -16,7 +17,7 @@ export const analyzeEmailContent = async (email: any) => {
   const structureAnalysis = analyzeEmailStructure(emailContent);
   
   // Analyze spelling and grammar
-  const spellingResult = await checkSpellingAndGrammar(emailContent);
+  const spellingResult = await checkGrammar(emailContent);
   
   // Analyze tone and clarity (simplified simulation)
   const scores: ScoreResult[] = [];
