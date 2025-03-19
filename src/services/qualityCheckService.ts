@@ -1,6 +1,6 @@
 
 import { QualityCheck } from '@/types';
-import { getQualityChecks, saveQualityCheck as saveQC } from './storage/qualityCheckStorageService';
+import { getQualityChecks as getStoredQualityChecks, saveQualityCheck as saveQC } from './storage/qualityCheckStorageService';
 import { analyzeEmailStructure } from './structural/emailStructureService';
 import { getPerformanceData as getPerfData, CRITERIA } from './reports/performanceDataService';
 
@@ -18,7 +18,7 @@ export { analyzeEmailStructure };
  * Get all quality checks - delegated to storage service
  */
 export const getQualityChecks = (): QualityCheck[] => {
-  return getQualityChecks();
+  return getStoredQualityChecks();
 };
 
 /**
