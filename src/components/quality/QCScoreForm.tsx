@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
-import { CRITERIA } from '@/lib/mock-data';
+import { CRITERIA, analyzeEmailStructure } from '@/services/qualityCheckService';
 import { Separator } from '@/components/ui/separator';
 import { ScoreResult } from '@/types';
 import { Save, Loader2, Wand2, Check, X, User } from 'lucide-react';
@@ -55,6 +54,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
   const [recommendations, setRecommendations] = useState<string[]>(['']);
   const [isAutoScoring, setIsAutoScoring] = useState(false);
   const [aiAssisted, setAiAssisted] = useState(false);
+  const [structureAnalysis, setStructureAnalysis] = useState<any>(null);
 
   // Load initial data when it becomes available
   useEffect(() => {
@@ -70,6 +70,29 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
     }
   }, [initialData]);
 
+  // Analyze structure when email changes
+  useEffect(() => {
+    if (email?.body) {
+      const structureResults = analyzeEmailStructure(email.body);
+      setStructureAnalysis(structureResults);
+      
+      // Update the structure score if not already set by AI
+      if (!initialData) {
+        setScores(prev => 
+          prev.map(item => 
+            item.criteriaId === 'structure' 
+              ? { 
+                  ...item, 
+                  score: structureResults.score,
+                  feedback: structureResults.feedback
+                } 
+              : item
+          )
+        );
+      }
+    }
+  }, [email, initialData]);
+
   // Reset form when email changes
   useEffect(() => {
     if (!email) {
@@ -82,6 +105,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
       setGeneralFeedback('');
       setRecommendations(['']);
       setAiAssisted(false);
+      setStructureAnalysis(null);
     }
   }, [email]);
 
@@ -128,7 +152,22 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
     try {
       const result = await onAutoScore(email);
       
-      setScores(result.scores);
+      // If we have structure analysis, update the structure score in the AI results
+      if (structureAnalysis) {
+        const updatedScores = result.scores.map(score => 
+          score.criteriaId === 'structure' 
+            ? { 
+                ...score, 
+                score: structureAnalysis.score,
+                feedback: structureAnalysis.feedback
+              } 
+            : score
+        );
+        setScores(updatedScores);
+      } else {
+        setScores(result.scores);
+      }
+      
       setGeneralFeedback(result.generalFeedback);
       
       // Convert recommendations array to the form state format
