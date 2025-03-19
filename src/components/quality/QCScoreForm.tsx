@@ -10,6 +10,8 @@ import { Separator } from '@/components/ui/separator';
 import { ScoreResult } from '@/types';
 import { Save, Loader2, Wand2, Check, X, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { addAgent, getAgents } from '@/services/agentService';
 
 interface QCScoreFormProps {
   onSubmit: (scores: ScoreResult[], feedback: string, recommendations: string[], agentName: string) => void;
@@ -43,6 +45,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
   initialData,
   isAnalyzing = false
 }) => {
+  const { toast } = useToast();
   const [scores, setScores] = useState<ScoreResult[]>(
     CRITERIA.map(criteria => ({
       criteriaId: criteria.id,
@@ -55,6 +58,14 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
   const [isAutoScoring, setIsAutoScoring] = useState(false);
   const [aiAssisted, setAiAssisted] = useState(false);
   const [structureAnalysis, setStructureAnalysis] = useState<any>(null);
+  const [agentsList, setAgentsList] = useState<Array<{id: string, name: string}>>([]);
+  const [agentName, setAgentName] = useState('');
+
+  // Load agents when component mounts
+  useEffect(() => {
+    const agents = getAgents();
+    setAgentsList(agents.map(agent => ({ id: agent.id, name: agent.name })));
+  }, []);
 
   // Load initial data when it becomes available
   useEffect(() => {
@@ -93,7 +104,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
     }
   }, [email, initialData]);
 
-  // Reset form when email changes
+  // Reset form when email changes and set agent name
   useEffect(() => {
     if (!email) {
       // Reset form to defaults
@@ -106,6 +117,8 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
       setRecommendations(['']);
       setAiAssisted(false);
       setStructureAnalysis(null);
+    } else if (email?.agentName) {
+      setAgentName(email.agentName);
     }
   }, [email]);
 
@@ -140,8 +153,41 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
   };
 
   const handleSubmit = () => {
+    // Ensure we have an agent name before proceeding
+    if (!agentName.trim()) {
+      toast({
+        title: "Agent name required",
+        description: "Please enter an agent name before submitting",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if agent exists, if not create a new agent profile
+    const agentExists = agentsList.some(agent => 
+      agent.name.toLowerCase() === agentName.toLowerCase()
+    );
+    
+    if (!agentExists) {
+      // Create a new agent with default department
+      const newAgent = addAgent({
+        name: agentName,
+        email: `${agentName.toLowerCase().replace(/\s+/g, '.')}@example.com`,
+        department: 'Customer Support'
+      });
+      
+      toast({
+        title: "Agent profile created",
+        description: `A new agent profile for "${agentName}" has been created.`,
+        variant: "success"
+      });
+      
+      // Update local agents list
+      setAgentsList(prev => [...prev, { id: newAgent.id, name: newAgent.name }]);
+    }
+    
     const filteredRecommendations = recommendations.filter(r => r.trim() !== '');
-    onSubmit(scores, generalFeedback, filteredRecommendations, email?.agentName || 'Unknown Agent');
+    onSubmit(scores, generalFeedback, filteredRecommendations, agentName);
   };
 
   const handleAutoScore = async () => {
@@ -214,6 +260,29 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
             <span>Analyzing email content...</span>
           </div>
         )}
+        
+        {/* Agent Name Input */}
+        <div className="space-y-2">
+          <Label htmlFor="agent-name" className="font-medium">Agent Name</Label>
+          <Input 
+            id="agent-name"
+            placeholder="Enter agent name"
+            value={agentName}
+            onChange={(e) => setAgentName(e.target.value)}
+            disabled={disabled || isSubmitting}
+            list="agents-list"
+          />
+          <datalist id="agents-list">
+            {agentsList.map(agent => (
+              <option key={agent.id} value={agent.name} />
+            ))}
+          </datalist>
+          <p className="text-xs text-muted-foreground">
+            {agentsList.length > 0 
+              ? "Select from existing agents or enter a new name to create an agent profile" 
+              : "Enter a name to create a new agent profile"}
+          </p>
+        </div>
         
         {email && onAutoScore && (
           <Button

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import EmailContentInput from '@/components/quality/EmailContentInput';
 import { saveQualityCheck } from '@/services/qualityCheckService';
 import { useNavigate } from 'react-router-dom';
+import { getAgent } from '@/services/agentService';
 
 const QualityCheckPage = () => {
   const { toast } = useToast();
@@ -224,10 +226,20 @@ const QualityCheckPage = () => {
         return total + (score.score * 0.25); // Equal 25% weight for all criteria
       }, 0));
       
+      // Get agent ID - try to find it from existing agents
+      let agentId = selectedEmail.agentId || 'unknown';
+      
+      // Look up agent by name to get their ID
+      const agent = getAgent(agentId);
+      // If we found an agent, use their ID, otherwise it will use the email's agentId or 'unknown'
+      if (agent && agent.id) {
+        agentId = agent.id;
+      }
+      
       // Create new quality check record
       const newQualityCheck: QualityCheck = {
         id: `qc-${Date.now()}`,
-        agentId: selectedEmail.agentId || 'unknown',
+        agentId: agentId,
         agentName: agentName,
         emailId: selectedEmail.id,
         emailSubject: selectedEmail.subject,
@@ -242,11 +254,12 @@ const QualityCheckPage = () => {
       };
       
       // Save the quality check
-      saveQualityCheck(newQualityCheck);
+      const savedCheck = saveQualityCheck(newQualityCheck);
       
       toast({
         title: "Quality Check Saved",
         description: `Assessment for ${agentName}'s email has been saved successfully.`,
+        variant: "success"
       });
       
       // Navigate to reports page to show the saved assessment

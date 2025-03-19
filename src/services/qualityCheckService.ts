@@ -28,8 +28,8 @@ export const saveQualityCheck = (qualityCheck: QualityCheck): QualityCheck => {
   const result = saveQC(qualityCheck);
   
   if (!result.success) {
-    // This could be enhanced with a toast notification in the future
     console.error('Failed to save quality check. Storage may be full.');
+    // The toast is now handled by the component that calls this function
   }
   
   return qualityCheck;
