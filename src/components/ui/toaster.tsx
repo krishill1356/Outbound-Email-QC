@@ -27,7 +27,7 @@ export function Toaster() {
         }
         
         return (
-          <Toast key={id} {...props}>
+          <Toast key={id} {...props} variant={variant}>
             <div className="flex">
               <div className="mr-2">
                 <Icon className={`h-5 w-5 ${
