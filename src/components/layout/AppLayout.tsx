@@ -5,7 +5,6 @@ import {
   LayoutDashboard, 
   MailCheck, 
   BarChart3, 
-  FileText, 
   Users, 
   Settings,
   Menu,
@@ -60,7 +59,6 @@ const AppLayout = () => {
                 <NavItem to="/" icon={<LayoutDashboard size={20} />} label="Dashboard" />
                 <NavItem to="/quality-check" icon={<MailCheck size={20} />} label="Quality Check" />
                 <NavItem to="/reports" icon={<BarChart3 size={20} />} label="Reports" />
-                <NavItem to="/templates" icon={<FileText size={20} />} label="Templates" />
                 <NavItem to="/agents" icon={<Users size={20} />} label="Agents" />
                 <NavItem to="/settings" icon={<Settings size={20} />} label="Settings" />
               </ul>

@@ -15,7 +15,6 @@ import { addAgent } from "@/services/agentService";
 // Define a schema for agent validation
 const agentSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Please enter a valid email address"),
   department: z.string().min(1, "Please select a department"),
 });
 
@@ -33,7 +32,6 @@ const AddAgentDialog = ({ onAgentAdded }: AddAgentDialogProps) => {
     resolver: zodResolver(agentSchema),
     defaultValues: {
       name: "",
-      email: "",
       department: "",
     },
   });
@@ -41,7 +39,6 @@ const AddAgentDialog = ({ onAgentAdded }: AddAgentDialogProps) => {
   const onSubmit = (values: AgentFormValues) => {
     addAgent({
       name: values.name,
-      email: values.email,
       department: values.department,
     });
 
@@ -52,6 +49,7 @@ const AddAgentDialog = ({ onAgentAdded }: AddAgentDialogProps) => {
     toast({
       title: "Agent added",
       description: "The agent has been added successfully",
+      variant: "success",
     });
   };
 
@@ -80,19 +78,6 @@ const AddAgentDialog = ({ onAgentAdded }: AddAgentDialogProps) => {
                   <FormLabel>Name</FormLabel>
                   <FormControl>
                     <Input placeholder="Enter agent's full name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input type="email" placeholder="Enter agent's email" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
