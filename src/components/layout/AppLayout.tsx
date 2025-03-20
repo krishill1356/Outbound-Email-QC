@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Outlet, NavLink } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, 
   MailCheck, 
@@ -8,19 +8,48 @@ import {
   Users, 
   Settings,
   Menu,
-  X
+  X,
+  Moon,
+  Sun
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { motion, AnimatePresence } from "framer-motion";
+import { getGeneralSettings, saveThemeSettings, applyTheme } from "@/services/settingsService";
+import { Button } from "@/components/ui/button";
 
 const AppLayout = () => {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
+  const [isDarkMode, setIsDarkMode] = useState(
+    document.documentElement.classList.contains('dark')
+  );
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Apply theme when component mounts
+  useEffect(() => {
+    applyTheme();
+    setIsDarkMode(document.documentElement.classList.contains('dark'));
+  }, []);
+  
+  // Redirect to default view if on root path
+  useEffect(() => {
+    if (location.pathname === '/') {
+      const { defaultView } = getGeneralSettings();
+      navigate(`/${defaultView === 'dashboard' ? '' : defaultView}`);
+    }
+  }, [location.pathname, navigate]);
   
   useEffect(() => {
     setSidebarOpen(!isMobile);
   }, [isMobile]);
+
+  const toggleTheme = () => {
+    const newTheme = isDarkMode ? 'light' : 'dark';
+    saveThemeSettings(newTheme);
+    setIsDarkMode(!isDarkMode);
+  };
   
   return (
     <div className="flex min-h-screen bg-background">
@@ -43,7 +72,7 @@ const AppLayout = () => {
             exit={{ x: isMobile ? -280 : 0, opacity: isMobile ? 0 : 1 }}
             transition={{ duration: 0.2 }}
             className={cn(
-              "bg-sidebar min-h-screen text-sidebar-foreground w-64 flex flex-col",
+              "bg-sidebar min-h-screen text-sidebar-foreground w-64 flex flex-col modern-scrollbar",
               isMobile && "fixed z-40 shadow-xl"
             )}
           >
@@ -66,7 +95,17 @@ const AppLayout = () => {
             
             <div className="p-4 mt-auto">
               <div className="p-3 rounded-lg bg-sidebar-accent text-sidebar-accent-foreground text-sm">
-                <p className="font-medium">Email QC v1.0</p>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium">Email QC v1.0</p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleTheme}
+                    className="h-8 w-8 rounded-full bg-sidebar-accent-foreground/10"
+                  >
+                    {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+                  </Button>
+                </div>
                 <p className="text-xs opacity-70 mt-1">Evaluate email quality with precision</p>
               </div>
             </div>

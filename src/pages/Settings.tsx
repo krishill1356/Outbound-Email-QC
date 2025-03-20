@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { 
   Card, 
@@ -33,13 +34,28 @@ import {
   Save,
   RefreshCw,
   Mail,
-  Database
+  Database,
+  Check,
+  Moon,
+  Sun,
+  Monitor
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { motion } from 'framer-motion';
 import Logo from '@/components/common/Logo';
 import { CRITERIA } from '@/lib/mock-data';
-import { getZammadSettings, saveZammadSettings, testConnection } from '@/services/zammadService';
+import { 
+  getZammadSettings, 
+  saveZammadSettings, 
+  testConnection 
+} from '@/services/zammadService';
+import { 
+  getGeneralSettings, 
+  saveGeneralSettings,
+  getSettings,
+  saveThemeSettings,
+  applyTheme
+} from '@/services/settingsService';
 
 const Settings = () => {
   const { toast } = useToast();
@@ -47,14 +63,34 @@ const Settings = () => {
   const [zammadUrl, setZammadUrl] = useState('');
   const [isConfigured, setIsConfigured] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [generalSettings, setGeneralSettings] = useState({
+    language: 'en',
+    timezone: 'utc',
+    defaultView: 'dashboard'
+  });
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
   
   // Load saved settings on component mount
   useEffect(() => {
-    const settings = getZammadSettings();
-    if (settings) {
-      setZammadUrl(settings.apiUrl || '');
-      setApiKey(settings.apiToken || '');
-      setIsConfigured(!!settings.apiUrl && !!settings.apiToken);
+    // Load Zammad settings
+    const zSettings = getZammadSettings();
+    if (zSettings) {
+      setZammadUrl(zSettings.apiUrl || '');
+      setApiKey(zSettings.apiToken || '');
+      setIsConfigured(!!zSettings.apiUrl && !!zSettings.apiToken);
+    }
+    
+    // Load general settings
+    const gSettings = getGeneralSettings();
+    setGeneralSettings(gSettings);
+    
+    // Load appearance settings
+    const aSettings = getSettings('appearance');
+    if (aSettings?.theme) {
+      setTheme(aSettings.theme);
+    } else {
+      setTheme('system');
     }
   }, []);
   
@@ -123,6 +159,44 @@ const Settings = () => {
     }
   };
   
+  const handleSaveGeneralSettings = () => {
+    setIsSaving(true);
+    
+    try {
+      saveGeneralSettings(generalSettings);
+      toast({
+        title: "Settings saved",
+        description: "General settings have been updated successfully."
+      });
+    } catch (error) {
+      console.error('Error saving general settings:', error);
+      toast({
+        title: "Save failed",
+        description: "Failed to save general settings.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleChangeTheme = (newTheme: 'light' | 'dark' | 'system') => {
+    setTheme(newTheme);
+    saveThemeSettings(newTheme);
+    toast({
+      title: "Theme updated",
+      description: `Theme changed to ${newTheme}.`
+    });
+  };
+  
+  const handleSaveQCSettings = () => {
+    // Implement QC settings save
+    toast({
+      title: "QC Settings saved",
+      description: "Quality check criteria have been updated."
+    });
+  };
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -141,35 +215,39 @@ const Settings = () => {
       </section>
       
       <Tabs defaultValue="zammad" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="zammad">
+        <TabsList className="bg-card border">
+          <TabsTrigger value="zammad" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Mail className="h-4 w-4 mr-2" />
             Zammad Integration
           </TabsTrigger>
-          <TabsTrigger value="qc-settings">
+          <TabsTrigger value="qc-settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Database className="h-4 w-4 mr-2" />
             QC Settings
           </TabsTrigger>
-          <TabsTrigger value="profile">
+          <TabsTrigger value="appearance" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Moon className="h-4 w-4 mr-2" />
+            Appearance
+          </TabsTrigger>
+          <TabsTrigger value="profile" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <User className="h-4 w-4 mr-2" />
             User Profile
           </TabsTrigger>
-          <TabsTrigger value="notifications">
+          <TabsTrigger value="notifications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Bell className="h-4 w-4 mr-2" />
             Notifications
           </TabsTrigger>
-          <TabsTrigger value="security">
+          <TabsTrigger value="security" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Lock className="h-4 w-4 mr-2" />
             Security
           </TabsTrigger>
-          <TabsTrigger value="general">
+          <TabsTrigger value="general" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <SettingsIcon className="h-4 w-4 mr-2" />
             General
           </TabsTrigger>
         </TabsList>
         
         <TabsContent value="zammad" className="space-y-4">
-          <Card>
+          <Card className="hover-card">
             <CardHeader>
               <CardTitle>Zammad Integration</CardTitle>
               <CardDescription>
@@ -258,7 +336,7 @@ const Settings = () => {
           </Card>
           
           {isConfigured && (
-            <Card>
+            <Card className="hover-card">
               <CardHeader>
                 <CardTitle>Data Import</CardTitle>
                 <CardDescription>
@@ -306,7 +384,7 @@ const Settings = () => {
         </TabsContent>
         
         <TabsContent value="qc-settings" className="space-y-4">
-          <Card>
+          <Card className="hover-card">
             <CardHeader>
               <CardTitle>Quality Check Settings</CardTitle>
               <CardDescription>
@@ -328,7 +406,7 @@ const Settings = () => {
                       max="1" 
                       step="0.05"
                       defaultValue={criteria.weight.toString()}
-                      className="w-full"
+                      className="w-full accent-primary"
                     />
                     <p className="text-sm text-muted-foreground">{criteria.description}</p>
                   </div>
@@ -336,7 +414,7 @@ const Settings = () => {
               </div>
             </CardContent>
             <CardFooter>
-              <Button>
+              <Button onClick={handleSaveQCSettings}>
                 <Save className="h-4 w-4 mr-2" />
                 Save QC Settings
               </Button>
@@ -344,8 +422,55 @@ const Settings = () => {
           </Card>
         </TabsContent>
         
+        <TabsContent value="appearance" className="space-y-4">
+          <Card className="hover-card">
+            <CardHeader>
+              <CardTitle>Appearance Settings</CardTitle>
+              <CardDescription>
+                Customize the look and feel of your application
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Theme</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <Button 
+                    variant={theme === 'light' ? 'default' : 'outline'} 
+                    className="flex flex-col items-center justify-center h-24 gap-2"
+                    onClick={() => handleChangeTheme('light')}
+                  >
+                    <Sun className="h-8 w-8" />
+                    <span>Light</span>
+                    {theme === 'light' && <Check className="absolute top-2 right-2 h-4 w-4" />}
+                  </Button>
+                  
+                  <Button 
+                    variant={theme === 'dark' ? 'default' : 'outline'}
+                    className="flex flex-col items-center justify-center h-24 gap-2"
+                    onClick={() => handleChangeTheme('dark')}
+                  >
+                    <Moon className="h-8 w-8" />
+                    <span>Dark</span>
+                    {theme === 'dark' && <Check className="absolute top-2 right-2 h-4 w-4" />}
+                  </Button>
+                  
+                  <Button 
+                    variant={theme === 'system' ? 'default' : 'outline'}
+                    className="flex flex-col items-center justify-center h-24 gap-2"
+                    onClick={() => handleChangeTheme('system')}
+                  >
+                    <Monitor className="h-8 w-8" />
+                    <span>System</span>
+                    {theme === 'system' && <Check className="absolute top-2 right-2 h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
         <TabsContent value="profile" className="space-y-4">
-          <Card>
+          <Card className="hover-card">
             <CardHeader>
               <CardTitle>User Profile</CardTitle>
               <CardDescription>
@@ -388,7 +513,7 @@ const Settings = () => {
         </TabsContent>
         
         <TabsContent value="notifications" className="space-y-4">
-          <Card>
+          <Card className="hover-card">
             <CardHeader>
               <CardTitle>Notification Preferences</CardTitle>
               <CardDescription>
@@ -445,7 +570,7 @@ const Settings = () => {
         </TabsContent>
         
         <TabsContent value="security" className="space-y-4">
-          <Card>
+          <Card className="hover-card">
             <CardHeader>
               <CardTitle>Security Settings</CardTitle>
               <CardDescription>
@@ -486,7 +611,7 @@ const Settings = () => {
         </TabsContent>
         
         <TabsContent value="general" className="space-y-4">
-          <Card>
+          <Card className="hover-card">
             <CardHeader>
               <CardTitle>General Settings</CardTitle>
               <CardDescription>
@@ -496,7 +621,10 @@ const Settings = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="language">Language</Label>
-                <Select defaultValue="en">
+                <Select 
+                  value={generalSettings.language}
+                  onValueChange={(value) => setGeneralSettings({...generalSettings, language: value})}
+                >
                   <SelectTrigger id="language">
                     <SelectValue placeholder="Select language" />
                   </SelectTrigger>
@@ -511,7 +639,10 @@ const Settings = () => {
               
               <div className="space-y-2">
                 <Label htmlFor="timezone">Timezone</Label>
-                <Select defaultValue="utc">
+                <Select 
+                  value={generalSettings.timezone}
+                  onValueChange={(value) => setGeneralSettings({...generalSettings, timezone: value})}
+                >
                   <SelectTrigger id="timezone">
                     <SelectValue placeholder="Select timezone" />
                   </SelectTrigger>
@@ -527,7 +658,10 @@ const Settings = () => {
               
               <div className="space-y-2">
                 <Label htmlFor="default-view">Default View</Label>
-                <Select defaultValue="dashboard">
+                <Select 
+                  value={generalSettings.defaultView}
+                  onValueChange={(value) => setGeneralSettings({...generalSettings, defaultView: value})}
+                >
                   <SelectTrigger id="default-view">
                     <SelectValue placeholder="Select default view" />
                   </SelectTrigger>
@@ -541,7 +675,19 @@ const Settings = () => {
               </div>
             </CardContent>
             <CardFooter>
-              <Button>Save Settings</Button>
+              <Button onClick={handleSaveGeneralSettings} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Settings
+                  </>
+                )}
+              </Button>
             </CardFooter>
           </Card>
         </TabsContent>
