@@ -373,35 +373,71 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
           </Button>
         )}
         
-        {CRITERIA.map(criteria => (
-          <div key={criteria.id} className="space-y-2">
-            <div className="flex justify-between items-center">
-              <Label htmlFor={`score-${criteria.id}`} className="font-medium">
-                {criteria.name} (25%)
-              </Label>
-              <span className="text-xl font-bold">
-                {scores.find(s => s.criteriaId === criteria.id)?.score || 0}/10
-              </span>
+        {CRITERIA.map(criteria => {
+          const scoreItem = scores.find(s => s.criteriaId === criteria.id);
+          const breakdown = scoreItem?.breakdown;
+          
+          return (
+            <div key={criteria.id} className="space-y-2 pb-3 border-b border-border">
+              <div className="flex justify-between items-center">
+                <Label htmlFor={`score-${criteria.id}`} className="font-medium">
+                  {criteria.name} (25%)
+                </Label>
+                <span className="text-xl font-bold">
+                  {scoreItem?.score || 0}/10
+                </span>
+              </div>
+              <Slider
+                id={`score-${criteria.id}`}
+                min={0}
+                max={10}
+                step={1}
+                value={[scoreItem?.score || 0]}
+                onValueChange={([value]) => handleScoreChange(criteria.id, value)}
+                disabled={disabled || isSubmitting || (containsRudeLanguage && criteria.id !== 'tone')}
+              />
+              
+              {/* Display score breakdown if available */}
+              {breakdown && (
+                <div className="bg-muted/40 p-2 rounded-md my-2">
+                  <div className="text-xs font-medium mb-1">Score Breakdown:</div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                    {Object.entries(breakdown).map(([key, value]) => (
+                      <div key={key} className="flex justify-between items-center">
+                        <span className="text-xs capitalize">{key}:</span>
+                        <span className="text-xs font-medium">{value}/10</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <Textarea
+                placeholder={`Feedback on ${criteria.name.toLowerCase()}`}
+                className="h-20 resize-none"
+                value={scoreItem?.feedback || ''}
+                onChange={(e) => handleFeedbackChange(criteria.id, e.target.value)}
+                disabled={disabled || isSubmitting}
+              />
+              <p className="text-sm text-muted-foreground">{criteria.description}</p>
             </div>
-            <Slider
-              id={`score-${criteria.id}`}
-              min={0}
-              max={10}
-              step={1}
-              value={[scores.find(s => s.criteriaId === criteria.id)?.score || 0]}
-              onValueChange={([value]) => handleScoreChange(criteria.id, value)}
-              disabled={disabled || isSubmitting || (containsRudeLanguage && criteria.id !== 'tone')}
-            />
-            <Textarea
-              placeholder={`Feedback on ${criteria.name.toLowerCase()}`}
-              className="h-20 resize-none"
-              value={scores.find(s => s.criteriaId === criteria.id)?.feedback || ''}
-              onChange={(e) => handleFeedbackChange(criteria.id, e.target.value)}
-              disabled={disabled || isSubmitting}
-            />
-            <p className="text-sm text-muted-foreground">{criteria.description}</p>
+          );
+        })}
+
+        {/* If we have content stats from AI analysis, show them */}
+        {initialData && (initialData as any).contentStats && (
+          <div className="space-y-2 pb-3 border-b border-border">
+            <Label className="font-medium">Content Statistics</Label>
+            <div className="bg-muted/40 p-3 rounded-md grid grid-cols-2 gap-x-4 gap-y-2">
+              {Object.entries((initialData as any).contentStats).map(([key, value]) => (
+                <div key={key} className="flex justify-between">
+                  <span className="text-sm capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                  <span className="text-sm font-medium">{typeof value === 'number' && value % 1 !== 0 ? (value as number).toFixed(1) : value}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
+        )}
 
         <Separator />
 

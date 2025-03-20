@@ -11,6 +11,7 @@ interface ScoreDistributionProps {
   description?: string;
   badge?: string;
   data?: QualityCheck[]; // Added data prop to accept quality checks
+  showBreakdown?: boolean; // Option to show detailed score breakdown
 }
 
 /**
@@ -21,7 +22,8 @@ const ScoreDistributionPie: React.FC<ScoreDistributionProps> = ({
   title = "Score Distribution", 
   description = "Distribution of quality scores",
   badge,
-  data = []
+  data = [],
+  showBreakdown = false
 }) => {
   // Process data if provided
   const scores = propScores || processData(data);
@@ -46,6 +48,10 @@ const ScoreDistributionPie: React.FC<ScoreDistributionProps> = ({
       </Card>
     );
   }
+
+  // Process score breakdowns if available and requested
+  const breakdownData = showBreakdown && data.length > 0 ? 
+    processBreakdownData(data) : null;
 
   return (
     <Card className="glass-card">
@@ -94,6 +100,21 @@ const ScoreDistributionPie: React.FC<ScoreDistributionProps> = ({
             </PieChart>
           </ResponsiveContainer>
         </div>
+        
+        {/* Display breakdown data if available */}
+        {breakdownData && (
+          <div className="mt-4 border-t pt-4">
+            <h4 className="text-sm font-medium mb-2">Score Breakdown</h4>
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries(breakdownData).map(([key, value]) => (
+                <div key={key} className="flex justify-between items-center">
+                  <span className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                  <span className="text-xs font-medium">{value.toFixed(1)}/10</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -121,6 +142,37 @@ function processData(data: QualityCheck[]) {
   });
 
   return Object.values(scoreGroups).filter(group => group.value > 0);
+}
+
+// New helper function to process score breakdowns
+function processBreakdownData(data: QualityCheck[]) {
+  if (!data.length) return null;
+  
+  // Initialize counters for each score category
+  const breakdownTotals: {[key: string]: {total: number, count: number}} = {};
+  
+  // Collect all breakdown scores
+  data.forEach(check => {
+    check.scores.forEach(score => {
+      if (score.breakdown) {
+        Object.entries(score.breakdown).forEach(([key, value]) => {
+          if (!breakdownTotals[key]) {
+            breakdownTotals[key] = { total: 0, count: 0 };
+          }
+          breakdownTotals[key].total += Number(value);
+          breakdownTotals[key].count += 1;
+        });
+      }
+    });
+  });
+  
+  // Calculate averages
+  const averages: {[key: string]: number} = {};
+  Object.entries(breakdownTotals).forEach(([key, data]) => {
+    averages[key] = data.total / data.count;
+  });
+  
+  return averages;
 }
 
 export default ScoreDistributionPie;

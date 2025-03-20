@@ -1,16 +1,24 @@
-
-
-export interface QualityCriteria {
-  id: string;
-  name: string;
-  description: string;
-  weight: number;
+export interface ZammadSettings {
+  apiUrl: string;
+  apiToken: string;
 }
 
-export interface ScoreResult {
-  criteriaId: string;
-  score: number; // 0-10
-  feedback: string;
+export interface ZammadEmail {
+  id: string;
+  ticketId: string;
+  ticketNumber: string;
+  subject: string;
+  body: string;
+  from: string;
+  to: string;
+  agentId: string;
+  agentName: string;
+  createdAt: string;
+}
+
+export interface SpellCheckResult {
+  score: number;
+  suggestions: string[];
 }
 
 export interface QualityCheck {
@@ -26,38 +34,15 @@ export interface QualityCheck {
   overallScore: number;
   feedback: string;
   recommendations: string[];
-  status: 'completed' | 'draft';
+  status: string;
 }
 
-export interface Agent {
-  id: string;
-  name: string;
-  email?: string; // Made email optional
-  department: string;
-  avatar?: string;
-}
-
-export interface Template {
-  id: string;
-  name: string;
-  description: string;
-  content: string;
-  tags: string[];
-}
-
-export interface PerformanceData {
-  agentId: string;
-  date: string;
-  score: number;
-}
-
-export interface ScoreBreakdown {
+// Extend the ScoreResult interface to include breakdown
+export interface ScoreResult {
   criteriaId: string;
-  average: number;
-}
-
-export interface SpellCheckResult {
   score: number;
-  suggestions: string[];
+  feedback: string;
+  breakdown?: {
+    [key: string]: number;
+  };
 }
-
