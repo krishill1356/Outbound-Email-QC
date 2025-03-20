@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getAgents } from '@/services/agentService';
+import { Textarea } from '@/components/ui/textarea';
 
 interface EmailContentInputProps {
   onSubmit: (emailContent: string, subject: string, agentName: string) => void;
@@ -141,17 +142,16 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
           
           <div>
             <Label htmlFor="email-content">Email Content</Label>
-            <div
+            <Textarea
               id="email-content"
-              className="min-h-[300px] max-h-[500px] mt-1 p-3 border rounded-md bg-background overflow-y-auto"
-              contentEditable={true}
+              value={emailContent}
+              onChange={(e) => setEmailContent(e.target.value)}
+              placeholder="Paste or type email content here"
+              className="min-h-[300px] mt-1"
               onPaste={handlePaste}
-              onInput={(e) => setEmailContent((e.target as HTMLDivElement).innerHTML)}
-              style={{ whiteSpace: 'pre-wrap', direction: 'ltr', textAlign: 'left' }}
-              dangerouslySetInnerHTML={{ __html: emailContent }}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Paste the email content here. Formatting and images will be preserved.
+              Paste the email content here. Simple formatting will be preserved.
             </p>
           </div>
           
