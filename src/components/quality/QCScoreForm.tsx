@@ -186,11 +186,11 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
       
       const toneScore = scores.find(s => s.criteriaId === 'tone');
       if (toneScore && toneScore.score > 0) {
-        // Suggest setting tone score to 0
+        // Change from "warning" to "destructive" since "warning" is not a valid variant
         toast({
           title: "Possible inappropriate language detected",
           description: "Consider setting tone score to 0 if the email contains inappropriate language.",
-          variant: "warning"
+          variant: "destructive"
         });
       }
     }
