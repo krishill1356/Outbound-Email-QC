@@ -1,4 +1,5 @@
 
+
 export interface QualityCriteria {
   id: string;
   name: string;
@@ -31,7 +32,7 @@ export interface QualityCheck {
 export interface Agent {
   id: string;
   name: string;
-  email: string; // Auto-generated if not provided
+  email?: string; // Made email optional
   department: string;
   avatar?: string;
 }
@@ -59,3 +60,4 @@ export interface SpellCheckResult {
   score: number;
   suggestions: string[];
 }
+

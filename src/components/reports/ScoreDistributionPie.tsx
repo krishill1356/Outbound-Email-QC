@@ -3,23 +3,29 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Badge } from '@/components/ui/badge';
+import { QualityCheck } from '@/types';
 
 interface ScoreDistributionProps {
-  scores: { name: string; value: number; color: string }[];
+  scores?: { name: string; value: number; color: string }[];
   title?: string;
   description?: string;
   badge?: string;
+  data?: QualityCheck[]; // Added data prop to accept quality checks
 }
 
 /**
  * Enhanced pie chart for score distribution with animations and better tooltips
  */
 const ScoreDistributionPie: React.FC<ScoreDistributionProps> = ({ 
-  scores, 
+  scores: propScores, 
   title = "Score Distribution", 
   description = "Distribution of quality scores",
-  badge
+  badge,
+  data = []
 }) => {
+  // Process data if provided
+  const scores = propScores || processData(data);
+  
   // If no data, return empty state
   if (!scores.length) {
     return (
@@ -92,5 +98,29 @@ const ScoreDistributionPie: React.FC<ScoreDistributionProps> = ({
     </Card>
   );
 };
+
+// Helper function to process quality checks into score distribution data
+function processData(data: QualityCheck[]) {
+  if (!data.length) return [];
+
+  const scoreGroups = {
+    excellent: { name: 'Excellent (8-10)', value: 0, color: '#4ade80' },
+    good: { name: 'Good (6-7.9)', value: 0, color: '#facc15' },
+    needs_improvement: { name: 'Needs Improvement (0-5.9)', value: 0, color: '#f87171' }
+  };
+
+  data.forEach(check => {
+    const score = check.overallScore;
+    if (score >= 8) {
+      scoreGroups.excellent.value += 1;
+    } else if (score >= 6) {
+      scoreGroups.good.value += 1;
+    } else {
+      scoreGroups.needs_improvement.value += 1;
+    }
+  });
+
+  return Object.values(scoreGroups).filter(group => group.value > 0);
+}
 
 export default ScoreDistributionPie;

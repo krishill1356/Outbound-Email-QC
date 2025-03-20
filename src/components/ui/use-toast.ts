@@ -1,3 +1,4 @@
+
 import * as React from "react"
 
 import type {
@@ -129,7 +130,7 @@ type Toast = Omit<ToasterToast, "id">
 function toast({ ...props }: Toast) {
   const id = genId()
 
-  const update = (props: ToasterToast) =>
+  const update = (props: Partial<ToasterToast>) =>
     dispatch({
       type: "UPDATE_TOAST",
       toast: { ...props, id },
@@ -140,7 +141,6 @@ function toast({ ...props }: Toast) {
     type: "ADD_TOAST",
     toast: {
       ...props,
-      id,
       open: true,
       onOpenChange: (open) => {
         if (!open) dismiss()
