@@ -33,25 +33,36 @@ export const CRITERIA: QualityCriteria[] = [
 
 /**
  * Get performance data from quality checks
+ * @param agentId Optional filter by agent ID
  */
-export const getPerformanceData = () => {
+export const getPerformanceData = (agentId?: string) => {
   const checks = getQualityChecks();
   
+  // Filter checks by agent if specified
+  const filteredChecks = agentId 
+    ? checks.filter(check => check.agentId === agentId) 
+    : checks;
+  
   // Aggregate overall scores
-  const overallScores = checks.map(check => ({
+  const overallScores = filteredChecks.map(check => ({
     date: check.date,
     average: check.overallScore
   }));
 
   // Get agents from the quality checks
-  const uniqueAgentIds = [...new Set(checks.map(check => check.agentId))];
+  let uniqueAgentIds = [...new Set(filteredChecks.map(check => check.agentId))];
+  
+  // If filtering by agent, only include that agent
+  if (agentId) {
+    uniqueAgentIds = uniqueAgentIds.filter(id => id === agentId);
+  }
   
   // Calculate agent-specific scores
   const agentScores = uniqueAgentIds.map(agentId => {
     const agent = getAgent(agentId);
     if (!agent) return null;
     
-    const agentChecks = checks.filter(check => check.agentId === agentId);
+    const agentChecks = filteredChecks.filter(check => check.agentId === agentId);
     const trend = agentChecks.map(check => ({
       date: check.date,
       score: check.overallScore
@@ -93,4 +104,31 @@ export const getPerformanceData = () => {
     overall: overallScores,
     agents: agentScores
   };
+};
+
+/**
+ * Get performance data by criteria
+ * Helps with drill-down reports
+ */
+export const getPerformanceByCriteria = (criteriaId: string, agentId?: string) => {
+  const checks = getQualityChecks();
+  
+  // Filter checks by agent if specified
+  const filteredChecks = agentId 
+    ? checks.filter(check => check.agentId === agentId) 
+    : checks;
+  
+  // Extract scores for the specific criteria
+  const criteriaScores = filteredChecks.map(check => {
+    const score = check.scores.find(s => s.criteriaId === criteriaId);
+    return {
+      date: check.date,
+      agentId: check.agentId,
+      agentName: check.agentName,
+      score: score ? score.score : 0,
+      feedback: score ? score.feedback : ''
+    };
+  });
+  
+  return criteriaScores;
 };

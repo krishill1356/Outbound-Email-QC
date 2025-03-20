@@ -33,13 +33,15 @@ export const saveAgents = (agents: Agent[]): void => {
 /**
  * Add a new agent
  */
-export const addAgent = (agent: Omit<Agent, 'id' | 'avatar'>): Agent => {
+export const addAgent = (agent: Omit<Partial<Agent>, 'id' | 'avatar'> & { name: string, department: string }): Agent => {
   const agents = getAgents();
   
   // Create new agent with ID and avatar
   const newAgent: Agent = {
     id: `agent-${Date.now()}`,
-    ...agent,
+    name: agent.name,
+    department: agent.department,
+    email: agent.email || `${agent.name.toLowerCase().replace(/\s+/g, '.')}@example.com`, // Default email if not provided
     avatar: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70)}`
   };
   

@@ -1,118 +1,158 @@
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+ 
 @layer base {
   :root {
-    /* Air Travel Claim-inspired color scheme */
-    --background: 210 20% 98%;
-    --foreground: 222 47% 11%;
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-
+    --card-foreground: 240 10% 3.9%;
+ 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-
-    /* Primary blue from Air Travel Claim */
-    --primary: 210 100% 40%; 
+    --popover-foreground: 240 10% 3.9%;
+ 
+    --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
-
-    /* Secondary colors */
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-
-    --accent: 206 100% 50%;
-    --accent-foreground: 210 40% 98%;
-
-    /* Alert/Error red from Air Travel Claim */
-    --destructive: 0 85% 60%;
+ 
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+ 
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+ 
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+ 
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 210 100% 40%;
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 355.7 100% 97.3%;
 
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+
+    --sidebar: 224 71.4% 4.1%;
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-accent: 224 71.4% 8.1%;
+    --sidebar-accent-foreground: 210 20% 98%;
+ 
     --radius: 0.5rem;
   }
+ 
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+ 
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+ 
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+ 
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+ 
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+ 
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+ 
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+ 
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --success: 142.1 70.6% 45.3%;
+    --success-foreground: 144.9 80.4% 10%;
+ 
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
 
+    --sidebar: 224 71.4% 4.1%;
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-accent: 224 71.4% 8.1%;
+    --sidebar-accent-foreground: 210 20% 98%;
+  }
+}
+ 
+@layer base {
   * {
     @apply border-border;
   }
-
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', sans-serif;
-  }
-  
-  .glass-card {
-    @apply bg-white/80 backdrop-blur-sm border border-white/20 shadow-lg;
-  }
-  
-  .card-highlight {
-    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
-    @apply border border-white/10 shadow-md;
-  }
-  
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  /* Air Travel Claim specific styling */
-  .atc-gradient-bg {
-    background: linear-gradient(135deg, #f8fafc 0%, #e2f1ff 100%);
-  }
-
-  .atc-card {
-    @apply bg-white border border-slate-200 shadow-sm rounded-lg;
+    @apply bg-background text-foreground;
   }
 }
 
-/* Custom transitions and animations */
-.page-transition-enter {
-  opacity: 0;
-  transform: translateY(10px);
-}
-.page-transition-enter-active {
-  opacity: 1;
-  transform: translateY(0);
-  transition: opacity 300ms, transform 300ms;
-}
-.page-transition-exit {
-  opacity: 1;
-}
-.page-transition-exit-active {
-  opacity: 0;
-  transition: opacity 200ms;
+/* Glass card effect */
+.glass-card {
+  @apply bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm;
 }
 
-/* Scoring system animations */
-.score-bar {
-  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+/* Email content styling */
+.email-content {
+  @apply text-sm leading-relaxed;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.email-content img {
+  @apply max-w-full h-auto my-2 rounded;
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 3px;
+.email-content p {
+  @apply my-1.5;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 3px;
+.email-content ul, 
+.email-content ol {
+  @apply pl-5 my-2;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.2);
+.email-content ul li {
+  @apply list-disc;
+}
+
+.email-content ol li {
+  @apply list-decimal;
+}
+
+.email-content a {
+  @apply text-blue-600 hover:underline;
+}
+
+.email-content blockquote {
+  @apply pl-4 border-l-4 border-gray-300 italic my-2;
+}
+
+.email-content h1,
+.email-content h2,
+.email-content h3,
+.email-content h4,
+.email-content h5,
+.email-content h6 {
+  @apply font-medium my-2;
+}
+
+.email-content table {
+  @apply border-collapse border border-gray-300 my-2;
+}
+
+.email-content table td,
+.email-content table th {
+  @apply border border-gray-300 p-1;
+}
+
+.email-content pre {
+  @apply bg-gray-100 p-2 rounded my-2 overflow-x-auto text-xs;
+}
+
+.email-content code {
+  @apply bg-gray-100 px-1 py-0.5 rounded text-xs;
 }

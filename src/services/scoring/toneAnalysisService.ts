@@ -9,6 +9,17 @@
 export function analyzeTone(content: string) {
   const professionalKeywords = ['sincerely', 'regards', 'thank you', 'please', 'appreciate'];
   const politeKeywords = ['hello', 'hi', 'dear', 'good morning', 'good afternoon', 'good evening'];
+  const rudeLanguage = ['stupid', 'idiot', 'useless', 'incompetent', 'damn', 'crap', 'shit', 'fuck', 'ass', 'bitch', 'hell'];
+  
+  // Check for rude language or swearing
+  for (const word of rudeLanguage) {
+    if (content.toLowerCase().includes(word)) {
+      return {
+        score: 0,
+        feedback: 'The email contains inappropriate or rude language. This type of language should be avoided in professional communication.'
+      };
+    }
+  }
   
   let score = 5; // Neutral tone by default
   

@@ -24,7 +24,8 @@ import {
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { getAgents } from '@/services/agentService';
-import { getQualityChecks, getPerformanceData, CRITERIA } from '@/services/qualityCheckService';
+import { getQualityChecks } from '@/services/storage/qualityCheckStorageService';
+import { getPerformanceData, CRITERIA } from '@/services/reports/performanceDataService';
 
 const Dashboard = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '14d' | '30d'>('7d');
@@ -32,6 +33,7 @@ const Dashboard = () => {
   const [totalReviews, setTotalReviews] = useState(0);
   const [averageScore, setAverageScore] = useState(0);
   const [lowPerformers, setLowPerformers] = useState<number>(0);
+  const [agents] = useState(getAgents());
   
   // Update dashboard data when needed
   useEffect(() => {
@@ -60,7 +62,11 @@ const Dashboard = () => {
   const filterDataByPeriod = (data: any[]) => {
     if (!data || data.length === 0) return [];
     const days = selectedPeriod === '7d' ? 7 : selectedPeriod === '14d' ? 14 : 30;
-    return data.slice(-days);
+    
+    const now = new Date();
+    const cutoffDate = new Date(now.setDate(now.getDate() - days));
+    
+    return data.filter(item => new Date(item.date) >= cutoffDate);
   };
   
   const periodFilters = [

@@ -1,12 +1,12 @@
-
 import React, { useState } from 'react';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Check, Clipboard } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Loader2, Send } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { getAgents } from '@/services/agentService';
 
 interface EmailContentInputProps {
   onSubmit: (emailContent: string, subject: string, agentName: string) => void;
@@ -16,117 +16,161 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
   const [emailContent, setEmailContent] = useState('');
   const [subject, setSubject] = useState('');
   const [agentName, setAgentName] = useState('');
-  const [isPasting, setIsPasting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const [agentsList, setAgentsList] = useState<Array<{id: string, name: string}>>(
+    getAgents().map(agent => ({ id: agent.id, name: agent.name }))
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!emailContent.trim()) {
       toast({
         title: "Email content required",
-        description: "Please paste some email content to analyze",
-        variant: "destructive",
+        description: "Please paste in the email content",
+        variant: "destructive"
       });
       return;
     }
-
+    
     if (!subject.trim()) {
       toast({
         title: "Subject required",
-        description: "Please provide an email subject",
-        variant: "destructive",
+        description: "Please enter an email subject",
+        variant: "destructive"
       });
       return;
     }
-
+    
     if (!agentName.trim()) {
       toast({
         title: "Agent name required",
-        description: "Please provide the agent's name for reporting",
-        variant: "destructive",
+        description: "Please enter the agent's name",
+        variant: "destructive"
       });
       return;
     }
-
-    onSubmit(emailContent, subject, agentName);
-  };
-
-  const handlePasteFromClipboard = async () => {
+    
+    setIsSubmitting(true);
+    
     try {
-      setIsPasting(true);
-      const clipboardText = await navigator.clipboard.readText();
-      setEmailContent(clipboardText);
+      onSubmit(emailContent, subject, agentName);
+      
+      // Reset form
+      setEmailContent('');
+      setSubject('');
+      
       toast({
-        title: "Content pasted",
-        description: "Email content has been pasted from clipboard",
+        title: "Email submitted",
+        description: "The email has been loaded for quality checking",
+        variant: "success"
       });
     } catch (error) {
       toast({
-        title: "Could not access clipboard",
-        description: "Please paste the content manually",
-        variant: "destructive",
+        title: "Error",
+        description: "An error occurred while submitting the email",
+        variant: "destructive"
       });
-      console.error("Clipboard access error:", error);
     } finally {
-      setIsPasting(false);
+      setIsSubmitting(false);
     }
   };
-
+  
+  // Handle paste with formatting preservation
+  const handlePaste = (e: React.ClipboardEvent) => {
+    // Get plain text 
+    const plainText = e.clipboardData.getData('text/plain');
+    
+    // Get HTML content if available
+    let htmlContent = e.clipboardData.getData('text/html');
+    
+    // If we have HTML, use it (this preserves formatting)
+    if (htmlContent && htmlContent.trim() !== '') {
+      // Sanitize the HTML to avoid XSS attacks in a real app
+      // This is a simple example that keeps only safe HTML elements and attributes
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlContent, 'text/html');
+      
+      // Set the email content to the HTML content
+      setEmailContent(doc.body.innerHTML);
+      e.preventDefault(); // Prevent default paste behavior
+    } else {
+      // Otherwise just use plain text
+      setEmailContent(plainText);
+    }
+  };
+  
   return (
-    <Card className="mb-6">
+    <Card>
       <CardHeader>
         <CardTitle>Paste Email Content</CardTitle>
         <CardDescription>
-          Paste email content to analyze without using Zammad
+          Paste the full email content including any formatting to evaluate
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+          <div>
             <Label htmlFor="subject">Email Subject</Label>
             <Input
               id="subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Enter the email subject"
+              className="mt-1"
             />
           </div>
           
-          <div className="space-y-2">
+          <div>
             <Label htmlFor="agent-name">Agent Name</Label>
-            <Input
+            <Input 
               id="agent-name"
               value={agentName}
               onChange={(e) => setAgentName(e.target.value)}
-              placeholder="Enter the agent's name for reporting"
+              placeholder="Enter the agent's name"
+              className="mt-1"
+              list="agents-list"
             />
+            <datalist id="agents-list">
+              {agentsList.map(agent => (
+                <option key={agent.id} value={agent.name} />
+              ))}
+            </datalist>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="email-content">Email Body</Label>
-            <div className="relative">
-              <Textarea
-                id="email-content"
-                value={emailContent}
-                onChange={(e) => setEmailContent(e.target.value)}
-                placeholder="Paste email content here..."
-                className="min-h-[200px] font-mono text-sm"
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="absolute top-2 right-2"
-                onClick={handlePasteFromClipboard}
-                disabled={isPasting}
-              >
-                {isPasting ? <Check className="h-4 w-4" /> : <Clipboard className="h-4 w-4" />}
-                <span className="ml-1">{isPasting ? "Pasted" : "Paste"}</span>
-              </Button>
-            </div>
+          <div>
+            <Label htmlFor="email-content">Email Content</Label>
+            <div
+              id="email-content"
+              className="min-h-[300px] max-h-[500px] mt-1 p-3 border rounded-md bg-background overflow-y-auto"
+              contentEditable={true}
+              onPaste={handlePaste}
+              onInput={(e) => setEmailContent((e.target as HTMLDivElement).innerHTML)}
+              style={{ whiteSpace: 'pre-wrap' }}
+              dangerouslySetInnerHTML={{ __html: emailContent }}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Paste the email content here. Formatting and images will be preserved.
+            </p>
           </div>
-          <Button type="submit">
-            Analyze Email
+          
+          <Button 
+            type="submit" 
+            className="w-full"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <Send className="mr-2 h-4 w-4" />
+                Submit for Quality Check
+              </>
+            )}
           </Button>
         </form>
       </CardContent>

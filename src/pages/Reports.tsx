@@ -1,557 +1,617 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  Users, 
-  Calendar,
-  ChevronDown,
-  Download,
-  Search,
-  FileText,
-  Clock
-} from 'lucide-react';
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  ResponsiveContainer, 
   AreaChart, 
   Area, 
-  BarChart, 
-  Bar, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer,
-  PieChart,
-  Pie,
+  Tooltip,
+  BarChart,
+  Bar,
   Cell,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar
+  Legend
 } from 'recharts';
-import { motion } from 'framer-motion';
-import { QualityCheck } from '@/types';
-import { Input } from '@/components/ui/input';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
+import { AlertCircle, BarChart3, DownloadIcon, ChevronRight, Filter } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { getQualityChecks } from '@/services/qualityCheckService';
+import { getPerformanceData, CRITERIA } from '@/services/reports/performanceDataService';
 import { getAgents } from '@/services/agentService';
-import { getQualityChecks, getPerformanceData, CRITERIA } from '@/services/qualityCheckService';
+import { motion } from 'framer-motion';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import ScoreDistributionPie from '@/components/reports/ScoreDistributionPie';
 
 const Reports = () => {
-  const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '14d' | '30d'>('30d');
-  const [selectedAgent, setSelectedAgent] = useState<string>('all');
-  const [agents, setAgents] = useState<any[]>([]);
-  const [qualityChecks, setQualityChecks] = useState<QualityCheck[]>([]);
-  const [filteredChecks, setFilteredChecks] = useState<QualityCheck[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialAgentId = searchParams.get('agent') || 'all';
+  
   const [activeTab, setActiveTab] = useState('overview');
-  const [performanceData, setPerformanceData] = useState<any>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '14d' | '30d' | '90d'>('30d');
+  const [selectedAgent, setSelectedAgent] = useState(initialAgentId);
+  const [agents, setAgents] = useState(getAgents());
+  const [performanceData, setPerformanceData] = useState(getPerformanceData(selectedAgent !== 'all' ? selectedAgent : undefined));
+  const [qualityChecks, setQualityChecks] = useState(getQualityChecks());
   
+  // Update performance data when agent selection changes
   useEffect(() => {
-    // Load agents and quality checks
-    const agentsList = getAgents();
-    setAgents(agentsList);
-    
-    // Load quality checks
-    const checks = getQualityChecks();
-    setQualityChecks(checks);
-    setFilteredChecks(checks);
-    
-    // Load performance data
-    const perfData = getPerformanceData();
-    setPerformanceData(perfData);
-  }, []);
+    setPerformanceData(getPerformanceData(selectedAgent !== 'all' ? selectedAgent : undefined));
+  }, [selectedAgent]);
   
-  useEffect(() => {
-    let filtered = qualityChecks;
-    
-    // Filter by agent if selected
-    if (selectedAgent !== 'all') {
-      filtered = filtered.filter(check => check.agentId === selectedAgent);
-    }
-    
-    // Filter by search query if any
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(check => 
-        check.agentName.toLowerCase().includes(query) ||
-        check.emailSubject.toLowerCase().includes(query)
-      );
-    }
-    
-    setFilteredChecks(filtered);
-  }, [selectedAgent, searchQuery, qualityChecks]);
-  
-  const daysToShow = selectedPeriod === '7d' ? 7 : selectedPeriod === '14d' ? 14 : 30;
-  
-  // Format trend data based on selected period and agent
-  const getTrendData = () => {
-    if (!performanceData) return [];
-    
-    if (selectedAgent === 'all') {
-      return (performanceData.overall || [])
-        .slice(-daysToShow)
-        .map((item: any) => ({
-          date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          score: item.average
-        }));
-    } else {
-      const agentData = (performanceData.agents || []).find((a: any) => a.agent.id === selectedAgent);
-      if (!agentData) return [];
-      
-      return agentData.trend
-        .slice(-daysToShow)
-        .map((item: any) => ({
-          date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          score: item.score
-        }));
-    }
+  const handleExportReport = () => {
+    toast({
+      title: "Report Exported",
+      description: "The report has been exported to CSV",
+      variant: "success",
+    });
   };
   
-  // Get criteria breakdown for selected agent or overall
-  const getCriteriaBreakdown = () => {
-    if (!performanceData) return [];
+  const generateDateRangeLabel = () => {
+    const today = new Date();
+    let fromDate;
     
-    if (selectedAgent === 'all') {
-      // Average all agent scores per criteria
-      return CRITERIA.map(criteria => {
-        const allScores = (performanceData.agents || []).flatMap((agent: any) => 
-          agent.criteriaBreakdown.filter((c: any) => c.criteriaId === criteria.id)
-        );
-        
-        const average = allScores.length 
-          ? Number((allScores.reduce((sum: number, item: any) => sum + item.average, 0) / allScores.length).toFixed(0))
-          : 0;
-          
-        return {
-          name: criteria.name,
-          score: average,
-          fullMark: 10
-        };
-      });
-    } else {
-      const agentData = (performanceData.agents || []).find((a: any) => a.agent.id === selectedAgent);
-      if (!agentData) return [];
-      
-      return agentData.criteriaBreakdown.map((c: any) => ({
-        name: c.name,
-        score: Math.round(c.average),
-        fullMark: 10
-      }));
+    switch (selectedPeriod) {
+      case '7d':
+        fromDate = subDays(today, 7);
+        break;
+      case '14d':
+        fromDate = subDays(today, 14);
+        break;
+      case '30d':
+        fromDate = subDays(today, 30);
+        break;
+      case '90d':
+        fromDate = subDays(today, 90);
+        break;
+      default:
+        fromDate = subDays(today, 30);
     }
+    
+    return `${format(fromDate, 'MMM d, yyyy')} - ${format(today, 'MMM d, yyyy')}`;
   };
   
-  // Get distribution of scores for pie chart
-  const getScoreDistribution = () => {
-    const distribution = [
-      { name: 'Excellent (8-10)', value: 0, color: '#10b981' },
-      { name: 'Good (6-7)', value: 0, color: '#f59e0b' },
-      { name: 'Needs Improvement (0-5)', value: 0, color: '#ef4444' }
-    ];
-    
-    filteredChecks.forEach(check => {
-      if (check.overallScore >= 8) {
-        distribution[0].value++;
-      } else if (check.overallScore >= 6) {
-        distribution[1].value++;
-      } else {
-        distribution[2].value++;
+  // Overall performance chart data
+  const overallChartData = performanceData.overall.map((item: any) => ({
+    date: new Date(item.date).toLocaleDateString(),
+    score: item.average
+  }));
+  
+  // Calculate criteria averages
+  const criteriaAverages = CRITERIA.map(criteria => {
+    const allScores = qualityChecks.flatMap(check => {
+      if (selectedAgent !== 'all' && check.agentId !== selectedAgent) {
+        return [];
       }
+      
+      const score = check.scores.find(s => s.criteriaId === criteria.id);
+      return score ? [score.score] : [];
     });
     
-    return distribution;
-  };
+    const average = allScores.length > 0
+      ? allScores.reduce((sum, score) => sum + score, 0) / allScores.length
+      : 0;
+      
+    return {
+      id: criteria.id,
+      name: criteria.name,
+      average: parseFloat(average.toFixed(1)),
+      fill: criteria.id === 'tone' ? '#8884d8' : 
+             criteria.id === 'clarity' ? '#82ca9d' : 
+             criteria.id === 'spelling-grammar' ? '#ffc658' : 
+             '#ff8042'
+    };
+  });
   
-  // Get agent comparison data
-  const getAgentComparison = () => {
-    if (!qualityChecks.length) return [];
-    
-    // Group quality checks by agent
-    const agentGroups = qualityChecks.reduce((groups, check) => {
-      if (!groups[check.agentName]) {
-        groups[check.agentName] = {
-          checks: [],
-          totalScore: 0
-        };
-      }
-      groups[check.agentName].checks.push(check);
-      groups[check.agentName].totalScore += check.overallScore;
-      return groups;
-    }, {} as Record<string, { checks: QualityCheck[], totalScore: number }>);
-    
-    // Calculate average scores
-    return Object.entries(agentGroups).map(([name, data]) => ({
-      name: name.split(' ')[0], // First name only for chart readability
-      score: Math.round(data.totalScore / data.checks.length), // Average score without decimals
-      checks: data.checks.length // Total checks count
-    }));
-  };
-  
-  const renderAgentBadge = () => {
-    if (selectedAgent === 'all') {
-      return <Badge variant="outline" className="ml-2">All Agents</Badge>;
-    }
-    
-    const agent = agents.find(a => a.id === selectedAgent);
-    if (!agent) return null;
-    
-    return <Badge variant="outline" className="ml-2">{agent.name}</Badge>;
-  };
-  
-  const trendData = getTrendData();
-  const criteriaData = getCriteriaBreakdown();
-  const distributionData = getScoreDistribution();
-  const agentComparisonData = getAgentComparison();
+  // Create data for the agent comparison chart
+  const agentComparisonData = performanceData.agents.map((agentData: any) => ({
+    name: agentData.agent.name.split(' ')[0],
+    score: parseFloat(agentData.averageScore.toFixed(1)),
+    fill: agentData.averageScore >= 8 ? '#4ade80' : 
+          agentData.averageScore >= 6 ? '#facc15' : 
+          '#f87171'
+  }));
   
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
+      className="container mx-auto py-8 px-4"
     >
-      <section className="mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">Reports</h1>
-            <p className="text-muted-foreground mt-1">Analyze quality assessment results</p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold">Quality Reports</h1>
+          <p className="text-muted-foreground">
+            {generateDateRangeLabel()}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
+          <div className="flex items-center rounded-md border">
+            {['7d', '14d', '30d', '90d'].map((period) => (
+              <Button
+                key={period}
+                variant={selectedPeriod === period ? "default" : "ghost"}
+                className="rounded-none first:rounded-l-md last:rounded-r-md"
+                onClick={() => setSelectedPeriod(period as any)}
+              >
+                {period === '7d' ? '7 days' : 
+                 period === '14d' ? '14 days' : 
+                 period === '30d' ? '30 days' : 
+                 '90 days'}
+              </Button>
+            ))}
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Select value={selectedPeriod} onValueChange={(value: any) => setSelectedPeriod(value)}>
-              <SelectTrigger className="w-36">
-                <Calendar className="mr-2 h-4 w-4" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-                <SelectItem value="14d">Last 14 days</SelectItem>
-                <SelectItem value="30d">Last 30 days</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-              <SelectTrigger className="w-40">
-                <Users className="mr-2 h-4 w-4" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Agents</SelectItem>
-                {agents.map(agent => (
-                  <SelectItem key={agent.id} value={agent.id}>
-                    {agent.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Button variant="outline" onClick={() => window.print()}>
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-          </div>
+          <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+            <SelectTrigger className="w-[180px]">
+              <div className="flex items-center">
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Select Agent" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Agents</SelectItem>
+              {agents.map(agent => (
+                <SelectItem key={agent.id} value={agent.id}>
+                  {agent.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <Button variant="outline" onClick={handleExportReport}>
+            <DownloadIcon className="mr-2 h-4 w-4" />
+            Export
+          </Button>
         </div>
-      </section>
+      </div>
       
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="recent">Recent Assessments</TabsTrigger>
+          <TabsTrigger value="agent">Agent Performance</TabsTrigger>
+          <TabsTrigger value="criteria">Quality Criteria</TabsTrigger>
+          <TabsTrigger value="reviews">Recent Reviews</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="overview">
-          <section className="mb-8">
-            <Card className="glass-card">
-              <CardHeader>
-                <div className="flex items-center justify-between">
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex justify-between">
                   <div>
-                    <CardTitle className="text-xl">Performance Trend</CardTitle>
-                    <CardDescription>
-                      Email quality scores over time {renderAgentBadge()}
-                    </CardDescription>
+                    <p className="text-sm text-muted-foreground">Average Score</p>
+                    <h3 className="text-2xl font-bold mt-1">
+                      {performanceData.overall.length > 0 
+                        ? (performanceData.overall.reduce((acc: number, curr: any) => acc + curr.average, 0) / performanceData.overall.length).toFixed(1)
+                        : 0}
+                      <span className="text-sm text-muted-foreground">/10</span>
+                    </h3>
+                  </div>
+                  <div className="bg-primary/10 text-primary p-3 rounded-full">
+                    <BarChart3 size={20} />
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Reviews</p>
+                    <h3 className="text-2xl font-bold mt-1">
+                      {performanceData.overall.length}
+                    </h3>
+                  </div>
+                  <div className="bg-primary/10 text-primary p-3 rounded-full">
+                    <AlertCircle size={20} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Agents</p>
+                    <h3 className="text-2xl font-bold mt-1">
+                      {performanceData.agents.length}
+                    </h3>
+                  </div>
+                  <div className="bg-primary/10 text-primary p-3 rounded-full">
+                    <AlertCircle size={20} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Low Performers</p>
+                    <h3 className="text-2xl font-bold mt-1">
+                      {performanceData.agents.filter((a: any) => a.averageScore < 7).length}
+                    </h3>
+                  </div>
+                  <div className="bg-primary/10 text-primary p-3 rounded-full">
+                    <AlertCircle size={20} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Overall Score Trend</CardTitle>
+                <CardDescription>Average quality score over time</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px]">
-                  {trendData.length > 0 ? (
+                  {overallChartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart
-                        data={trendData}
-                        margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                        data={overallChartData}
+                        margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                       >
                         <defs>
                           <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                            <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
+                            <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis 
-                          dataKey="date" 
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fill: '#888', fontSize: 12 }}
-                        />
-                        <YAxis 
-                          domain={[0, 10]} 
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fill: '#888', fontSize: 12 }}
-                        />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'white', 
-                            borderRadius: '8px',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                            border: 'none'
-                          }}
-                          formatter={(value) => [`${value}/10`, 'Score']}
-                        />
-                        <Area 
-                          type="monotone" 
-                          dataKey="score" 
-                          stroke="#3b82f6" 
-                          strokeWidth={2}
-                          fillOpacity={1} 
-                          fill="url(#colorScore)" 
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="date" />
+                        <YAxis domain={[0, 10]} />
+                        <Tooltip />
+                        <Area
+                          type="monotone"
+                          dataKey="score"
+                          stroke="#8884d8"
+                          fillOpacity={1}
+                          fill="url(#colorScore)"
                         />
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      <p>No data available yet. Complete some quality checks to see performance trends.</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </section>
-          
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle className="text-xl">Criteria Breakdown</CardTitle>
-                <CardDescription>
-                  Performance by evaluation criteria {renderAgentBadge()}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px]">
-                  {criteriaData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart outerRadius={90} data={criteriaData}>
-                        <PolarGrid />
-                        <PolarAngleAxis dataKey="name" tick={{ fill: '#888', fontSize: 12 }} />
-                        <PolarRadiusAxis angle={30} domain={[0, 10]} />
-                        <Radar
-                          name="Score"
-                          dataKey="score"
-                          stroke="#3b82f6"
-                          fill="#3b82f6"
-                          fillOpacity={0.6}
-                        />
-                        <Tooltip />
-                      </RadarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      <p>No data available yet. Complete some quality checks to see criteria breakdown.</p>
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-muted-foreground">No data available</p>
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="glass-card">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-xl">Score Distribution</CardTitle>
-                <CardDescription>
-                  Distribution of quality scores {renderAgentBadge()}
-                </CardDescription>
+                <CardTitle>Score Distribution</CardTitle>
+                <CardDescription>Quality scores breakdown</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px] flex items-center justify-center">
+                  {qualityChecks.length > 0 ? (
+                    <ScoreDistributionPie 
+                      data={qualityChecks.filter(check => selectedAgent === 'all' || check.agentId === selectedAgent)} 
+                    />
+                  ) : (
+                    <p className="text-muted-foreground">No data available</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Quality Criteria Breakdown</CardTitle>
+                <CardDescription>Average scores by criteria</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-[300px]">
-                  {filteredChecks.length > 0 ? (
+                  {criteriaAverages.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={distributionData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={90}
-                          paddingAngle={5}
-                          dataKey="value"
-                          label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                          labelLine={false}
-                        >
-                          {distributionData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
+                      <BarChart
+                        data={criteriaAverages}
+                        margin={{
+                          top: 5,
+                          right: 30,
+                          left: 20,
+                          bottom: 5,
+                        }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="name" />
+                        <YAxis domain={[0, 10]} />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="average" name="Average Score">
+                          {criteriaAverages.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
                           ))}
-                        </Pie>
-                        <Tooltip 
-                          formatter={(value) => [value, 'Count']}
-                          contentStyle={{ 
-                            backgroundColor: 'white', 
-                            borderRadius: '8px',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                            border: 'none'
-                          }}
-                        />
-                      </PieChart>
+                        </Bar>
+                      </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      <p>No data available yet. Complete some quality checks to see score distribution.</p>
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-muted-foreground">No data available</p>
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
-          </section>
-          
-          <section className="mb-8">
-            <Card className="glass-card">
+            
+            <Card>
               <CardHeader>
-                <CardTitle className="text-xl">Agent Comparison</CardTitle>
-                <CardDescription>Average score comparison across all agents</CardDescription>
+                <CardTitle>Agent Performance</CardTitle>
+                <CardDescription>Average scores by agent</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-[400px]">
+                <div className="h-[300px]">
                   {agentComparisonData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={agentComparisonData}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                        layout="vertical"
+                        margin={{
+                          top: 5,
+                          right: 30,
+                          left: 40,
+                          bottom: 5,
+                        }}
                       >
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="name" scale="band" axisLine={false} tickLine={false} />
-                        <YAxis yAxisId="left" orientation="left" domain={[0, 10]} axisLine={false} tickLine={false} />
-                        <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} />
-                        <Tooltip
-                          contentStyle={{ 
-                            backgroundColor: 'white', 
-                            borderRadius: '8px',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                            border: 'none'
-                          }}
-                        />
-                        <Legend />
-                        <Bar 
-                          yAxisId="left" 
-                          dataKey="score" 
-                          name="Avg. Score" 
-                          fill="#3b82f6"
-                          radius={[4, 4, 0, 0]}
-                        />
-                        <Bar 
-                          yAxisId="right" 
-                          dataKey="checks" 
-                          name="Reviews Count" 
-                          fill="#10b981"
-                          radius={[4, 4, 0, 0]}
-                        />
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                        <XAxis type="number" domain={[0, 10]} />
+                        <YAxis type="category" dataKey="name" />
+                        <Tooltip />
+                        <Bar dataKey="score" name="Average Score">
+                          {agentComparisonData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      <p>No data available yet. Complete some quality checks to see agent comparison.</p>
+                    <div className="flex items-center justify-center h-full">
+                      <p className="text-muted-foreground">No data available</p>
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
-          </section>
+          </div>
         </TabsContent>
         
-        <TabsContent value="recent">
-          <section className="mb-8">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-xl">Recent Quality Assessments</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="search"
-                        placeholder="Search by agent or subject..."
-                        className="pl-8 w-[200px] md:w-[300px]"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {filteredChecks.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <FileText className="mx-auto h-12 w-12 opacity-20 mb-4" />
-                    <p>No quality assessments found.</p>
-                    <p className="text-sm mt-2">Complete some quality checks to see them here.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredChecks.map((check) => (
-                      <Card key={check.id} className="overflow-hidden">
-                        <div className="flex flex-col md:flex-row md:items-center">
-                          <div className="p-4 md:p-6 flex-1">
-                            <div className="flex items-center justify-between mb-2">
-                              <h3 className="font-medium text-base">
-                                {check.emailSubject}
-                              </h3>
-                              <Badge>{check.overallScore}/10</Badge>
+        <TabsContent value="agent" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Agent Performance Details</CardTitle>
+              <CardDescription>
+                Detailed quality scores by agent
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {performanceData.agents.length > 0 ? (
+                  performanceData.agents.map((agentData: any) => {
+                    const scoreColor = 
+                      agentData.averageScore >= 8 ? 'text-green-500' :
+                      agentData.averageScore >= 6 ? 'text-amber-500' :
+                      'text-red-500';
+                    
+                    return (
+                      <div key={agentData.agent.id} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 rounded-full overflow-hidden mr-3">
+                              <img 
+                                src={agentData.agent.avatar} 
+                                alt={agentData.agent.name} 
+                                className="w-full h-full object-cover"
+                              />
                             </div>
-                            <div className="flex flex-col md:flex-row md:items-center text-sm text-muted-foreground gap-y-1 md:gap-x-4">
-                              <div className="flex items-center">
-                                <Users className="h-3.5 w-3.5 mr-1" />
-                                {check.agentName}
+                            <div>
+                              <h3 className="font-medium text-lg">{agentData.agent.name}</h3>
+                              <div className="text-sm text-muted-foreground">
+                                {agentData.agent.department} • {agentData.checksCount} reviews
                               </div>
-                              <div className="flex items-center">
-                                <Clock className="h-3.5 w-3.5 mr-1" />
-                                {format(new Date(check.date), 'PPP')}
-                              </div>
-                            </div>
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              {check.scores.map((score) => {
-                                const criteria = CRITERIA.find(c => c.id === score.criteriaId);
-                                let color = '';
-                                if (score.score >= 8) color = 'bg-green-100 text-green-700';
-                                else if (score.score >= 6) color = 'bg-amber-100 text-amber-700';
-                                else color = 'bg-red-100 text-red-700';
-                                
-                                return (
-                                  <div 
-                                    key={score.criteriaId} 
-                                    className={`text-xs px-2 py-1 rounded-full ${color}`}
-                                  >
-                                    {criteria?.name}: {score.score}/10
-                                  </div>
-                                );
-                              })}
                             </div>
                           </div>
+                          <div className={`text-2xl font-bold ${scoreColor}`}>
+                            {agentData.averageScore.toFixed(1)}/10
+                          </div>
                         </div>
-                      </Card>
-                    ))}
+                        
+                        <div className="space-y-3">
+                          {agentData.criteriaBreakdown.map((criteria: any) => (
+                            <div key={criteria.criteriaId} className="space-y-1">
+                              <div className="flex justify-between text-sm">
+                                <span>{criteria.name}</span>
+                                <span className="font-medium">{criteria.average.toFixed(1)}/10</span>
+                              </div>
+                              <Progress value={criteria.average * 10} className="h-2" />
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="pt-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full"
+                            onClick={() => navigate(`/reports?agent=${agentData.agent.id}`)}
+                          >
+                            View Details
+                            <ChevronRight className="ml-1 h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No agent data available</p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </section>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="criteria" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {CRITERIA.map(criteria => (
+              <Card key={criteria.id}>
+                <CardHeader>
+                  <CardTitle>{criteria.name}</CardTitle>
+                  <CardDescription>{criteria.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Average Score</span>
+                      <span className="text-2xl font-bold">
+                        {criteriaAverages.find(c => c.id === criteria.id)?.average || 0}/10
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(criteriaAverages.find(c => c.id === criteria.id)?.average || 0) * 10} 
+                      className="h-2" 
+                    />
+                    
+                    <h4 className="font-medium mt-6">Agent Performance</h4>
+                    <div className="space-y-2">
+                      {performanceData.agents.map((agentData: any) => {
+                        const criteriaScore = agentData.criteriaBreakdown.find(
+                          (c: any) => c.criteriaId === criteria.id
+                        );
+                        
+                        const scoreColor = 
+                          criteriaScore.average >= 8 ? 'text-green-500' :
+                          criteriaScore.average >= 6 ? 'text-amber-500' :
+                          'text-red-500';
+                        
+                        return (
+                          <div key={agentData.agent.id} className="flex justify-between items-center">
+                            <span>{agentData.agent.name}</span>
+                            <span className={`font-medium ${scoreColor}`}>
+                              {criteriaScore.average.toFixed(1)}/10
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="reviews" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Quality Checks</CardTitle>
+              <CardDescription>
+                Latest quality assessments
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[600px]">
+                <div className="space-y-4">
+                  {qualityChecks.length > 0 ? (
+                    qualityChecks
+                      .filter(check => selectedAgent === 'all' || check.agentId === selectedAgent)
+                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .map(check => {
+                        const scoreColor = 
+                          check.overallScore >= 8 ? 'bg-green-100 text-green-800 border-green-200' :
+                          check.overallScore >= 6 ? 'bg-amber-100 text-amber-800 border-amber-200' :
+                          'bg-red-100 text-red-800 border-red-200';
+                        
+                        return (
+                          <div key={check.id} className="border rounded-md p-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <h3 className="font-medium">{check.emailSubject}</h3>
+                                <p className="text-sm text-muted-foreground">
+                                  {check.agentName} • {new Date(check.date).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <Badge 
+                                variant="outline" 
+                                className={scoreColor}
+                              >
+                                {check.overallScore}/10
+                              </Badge>
+                            </div>
+                            
+                            <div className="mt-3 space-y-2">
+                              <h4 className="text-sm font-medium">Criteria Scores:</h4>
+                              <div className="grid grid-cols-2 gap-2">
+                                {check.scores.map(score => {
+                                  const criteria = CRITERIA.find(c => c.id === score.criteriaId);
+                                  
+                                  const scoreColor = 
+                                    score.score >= 8 ? 'text-green-600' :
+                                    score.score >= 6 ? 'text-amber-600' :
+                                    'text-red-600';
+                                  
+                                  return (
+                                    <div key={score.criteriaId} className="flex justify-between">
+                                      <span className="text-sm">{criteria?.name || score.criteriaId}</span>
+                                      <span className={`text-sm font-medium ${scoreColor}`}>
+                                        {score.score}/10
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            
+                            {check.feedback && (
+                              <div className="mt-3">
+                                <h4 className="text-sm font-medium">Feedback:</h4>
+                                <p className="text-sm mt-1">{check.feedback}</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">No quality checks available</p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </motion.div>

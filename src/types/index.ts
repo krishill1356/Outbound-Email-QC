@@ -31,7 +31,7 @@ export interface QualityCheck {
 export interface Agent {
   id: string;
   name: string;
-  email: string;
+  email: string; // Auto-generated if not provided
   department: string;
   avatar?: string;
 }

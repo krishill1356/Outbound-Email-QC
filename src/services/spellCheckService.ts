@@ -14,7 +14,6 @@ export const checkGrammar = async (text: string): Promise<SpellCheckResult> => {
   const suggestions: string[] = [];
   
   // Common English errors and professional writing issues to check
-  // Reduced number of patterns with less aggressive scoring
   const commonErrors = [
     // Basic grammar and punctuation - only the most important ones
     { pattern: /\.{3,}/g, message: "Consider using a single period for sentence endings" },
@@ -28,6 +27,23 @@ export const checkGrammar = async (text: string): Promise<SpellCheckResult> => {
     
     // Fewer colloquialisms
     { pattern: /\b(lol|omg|btw)\b/gi, message: "Consider avoiding chat abbreviations in formal communication" },
+    
+    // Check for incorrectly joined words
+    { pattern: /\bthankyou\b/gi, message: "Consider separating 'thank you'" },
+    { pattern: /\bwithregards\b/gi, message: "Consider separating 'with regards'" },
+    { pattern: /\bbestregards\b/gi, message: "Consider separating 'best regards'" },
+    { pattern: /\bkindregards\b/gi, message: "Consider separating 'kind regards'" },
+    { pattern: /\bdon'tworry\b/gi, message: "Consider separating 'don't worry'" },
+    { pattern: /\bgoodmorning\b/gi, message: "Consider separating 'good morning'" },
+    { pattern: /\bgoodafternoon\b/gi, message: "Consider separating 'good afternoon'" },
+    { pattern: /\bgoodevening\b/gi, message: "Consider separating 'good evening'" },
+    
+    // Nonsensical words (sample - in a real app would be checked against a dictionary)
+    { pattern: /\basdfghjkl\b/gi, message: "Found nonsensical word 'asdfghjkl'" },
+    { pattern: /\bqwerty\b/gi, message: "Found potentially nonsensical word 'qwerty'" },
+    { pattern: /\bzxcvbnm\b/gi, message: "Found nonsensical word 'zxcvbnm'" },
+    { pattern: /\b[a-z]{1,2}\b/gi, message: "Very short words may be typos" },
+    { pattern: /\b[a-z]{15,}\b/gi, message: "Very long words may be typos or incorrectly joined words" },
   ];
   
   // Check for each error - less aggressive scoring
@@ -77,6 +93,15 @@ export const checkGrammar = async (text: string): Promise<SpellCheckResult> => {
   
   // Add a minimum score floor to prevent too low scores
   score = Math.max(5, Math.min(10, score)); // Minimum score is now 5
+  
+  // Special case for nonsensical words, which should have a bigger impact
+  for (const error of commonErrors.slice(-5)) { // Check only the nonsensical patterns
+    const matches = text.match(error.pattern);
+    if (matches && matches.length > 0) {
+      // More severe deduction for nonsensical words
+      score = Math.max(3, score - (matches.length * 1.5)); // Can go as low as 3
+    }
+  }
   
   // Round to whole number
   score = Math.round(score);

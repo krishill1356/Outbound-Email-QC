@@ -98,9 +98,12 @@ const QCEmailViewer: React.FC<QCEmailViewerProps> = ({ email, templateAnalysis }
           </div>
         )}
         
-        <ScrollArea className="border rounded-lg p-4 h-[400px]">
+        <ScrollArea className="border rounded-lg p-4 h-[400px] bg-white">
           <div className="prose max-w-none">
-            <div dangerouslySetInnerHTML={createMarkup()} />
+            <div 
+              dangerouslySetInnerHTML={createMarkup()} 
+              className="email-content" 
+            />
           </div>
         </ScrollArea>
       </CardContent>
