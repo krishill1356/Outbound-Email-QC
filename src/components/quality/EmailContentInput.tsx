@@ -1,8 +1,8 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Loader2, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -147,7 +147,7 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
               contentEditable={true}
               onPaste={handlePaste}
               onInput={(e) => setEmailContent((e.target as HTMLDivElement).innerHTML)}
-              style={{ whiteSpace: 'pre-wrap' }}
+              style={{ whiteSpace: 'pre-wrap', direction: 'ltr', textAlign: 'left' }}
               dangerouslySetInnerHTML={{ __html: emailContent }}
             />
             <p className="text-xs text-muted-foreground mt-1">

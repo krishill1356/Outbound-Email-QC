@@ -33,42 +33,55 @@ export const analyzeEmailContent = async (email: any) => {
     feedback: toneScore.feedback
   });
   
+  // If rude language/swearing was detected, set all scores to 0
+  const containsRudeLanguage = toneScore.score === 0;
+  
   // Add clarity score
   const clarityScore = analyzeClarity(emailContent);
   scores.push({
     criteriaId: 'clarity',
-    score: clarityScore.score,
-    feedback: clarityScore.feedback
+    score: containsRudeLanguage ? 0 : clarityScore.score,
+    feedback: containsRudeLanguage ? 
+      "Inappropriate language detected, affecting overall score." : 
+      clarityScore.feedback
   });
   
   // Add spelling & grammar score
   scores.push({
     criteriaId: 'spelling-grammar',
-    score: spellingResult.score,
-    feedback: spellingResult.suggestions.length > 0 
-      ? `Found ${spellingResult.suggestions.length} possible spelling/grammar issues: ${spellingResult.suggestions.length > 3 ? '...' : ''}`
-      : 'No significant spelling or grammar issues found.'
+    score: containsRudeLanguage ? 0 : spellingResult.score,
+    feedback: containsRudeLanguage ? 
+      "Inappropriate language detected, affecting overall score." : 
+      (spellingResult.suggestions.length > 0 
+        ? `Found ${spellingResult.suggestions.length} possible spelling/grammar issues: ${spellingResult.suggestions.length > 3 ? '...' : ''}`
+        : 'No significant spelling or grammar issues found.')
   });
   
   // Add structure score
   scores.push({
     criteriaId: 'structure',
-    score: structureAnalysis.score,
-    feedback: structureAnalysis.feedback
+    score: containsRudeLanguage ? 0 : structureAnalysis.score,
+    feedback: containsRudeLanguage ? 
+      "Inappropriate language detected, affecting overall score." : 
+      structureAnalysis.feedback
   });
   
   // Generate overall feedback
-  const generalFeedback = generateOverallFeedback(scores);
+  const generalFeedback = containsRudeLanguage ? 
+    "This email contains inappropriate language which results in an automatic zero score. All professional communication must be free from rude language and profanity." : 
+    generateOverallFeedback(scores);
   
   // Add sentiment analysis
-  const sentimentFeedback = analyzeSentiment(emailContent);
+  const sentimentFeedback = containsRudeLanguage ? "" : analyzeSentiment(emailContent);
   
   // Generate recommendations
-  const recommendations = generateRecommendations(scores);
+  const recommendations = containsRudeLanguage ? 
+    ["Remove all inappropriate language and profanity", "Ensure communication maintains professional tone at all times", "Consider using more formal language"] : 
+    generateRecommendations(scores);
   
   return {
     scores,
-    generalFeedback: `${generalFeedback} ${sentimentFeedback}`,
+    generalFeedback: containsRudeLanguage ? generalFeedback : `${generalFeedback} ${sentimentFeedback}`,
     recommendations,
     structureDetails: {
       hasGreeting: structureAnalysis.hasGreeting,

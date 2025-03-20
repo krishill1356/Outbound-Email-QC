@@ -60,6 +60,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
   const [structureAnalysis, setStructureAnalysis] = useState<any>(null);
   const [agentsList, setAgentsList] = useState<Array<{id: string, name: string}>>([]);
   const [agentName, setAgentName] = useState('');
+  const [containsRudeLanguage, setContainsRudeLanguage] = useState(false);
 
   // Load agents when component mounts
   useEffect(() => {
@@ -78,6 +79,12 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
       }
       
       setAiAssisted(true);
+      
+      // Check if rude language was detected (tone score = 0)
+      const toneScore = initialData.scores.find(s => s.criteriaId === 'tone');
+      if (toneScore && toneScore.score === 0) {
+        setContainsRudeLanguage(true);
+      }
     }
   }, [initialData]);
 
@@ -117,17 +124,50 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
       setRecommendations(['']);
       setAiAssisted(false);
       setStructureAnalysis(null);
+      setContainsRudeLanguage(false);
     } else if (email?.agentName) {
       setAgentName(email.agentName);
     }
   }, [email]);
 
+  // Handle score change, but enforce 0 if rude language detected
   const handleScoreChange = (criteriaId: string, score: number) => {
-    setScores(prev => 
-      prev.map(item => 
-        item.criteriaId === criteriaId ? { ...item, score: Math.round(score) } : item
-      )
-    );
+    // If it's the tone criteria being set to 0, this indicates rude language
+    if (criteriaId === 'tone' && score === 0) {
+      setContainsRudeLanguage(true);
+      // Set all scores to 0
+      setScores(prev => 
+        prev.map(item => ({ 
+          ...item, 
+          score: 0,
+          feedback: item.criteriaId === 'tone' ? 
+            item.feedback : "Inappropriate language detected, affecting all scores."
+        }))
+      );
+    } else if (criteriaId === 'tone' && score > 0 && containsRudeLanguage) {
+      // If tone is being changed from 0 to something else, we're removing the rude language flag
+      setContainsRudeLanguage(false);
+      // Update just this score
+      setScores(prev => 
+        prev.map(item => 
+          item.criteriaId === criteriaId ? { ...item, score: Math.round(score) } : item
+        )
+      );
+    } else if (containsRudeLanguage) {
+      // If rude language is detected, all scores must remain 0
+      toast({
+        title: "Cannot change score",
+        description: "Inappropriate language detected. All scores are set to 0.",
+        variant: "destructive"
+      });
+    } else {
+      // Normal score update
+      setScores(prev => 
+        prev.map(item => 
+          item.criteriaId === criteriaId ? { ...item, score: Math.round(score) } : item
+        )
+      );
+    }
   };
 
   const handleFeedbackChange = (criteriaId: string, feedback: string) => {
@@ -136,6 +176,24 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
         item.criteriaId === criteriaId ? { ...item, feedback } : item
       )
     );
+    
+    // If this is tone feedback and contains indication of rude language, update state
+    if (criteriaId === 'tone' && 
+        (feedback.toLowerCase().includes('inappropriate') || 
+         feedback.toLowerCase().includes('rude') || 
+         feedback.toLowerCase().includes('profanity') || 
+         feedback.toLowerCase().includes('swearing'))) {
+      
+      const toneScore = scores.find(s => s.criteriaId === 'tone');
+      if (toneScore && toneScore.score > 0) {
+        // Suggest setting tone score to 0
+        toast({
+          title: "Possible inappropriate language detected",
+          description: "Consider setting tone score to 0 if the email contains inappropriate language.",
+          variant: "warning"
+        });
+      }
+    }
   };
 
   const addRecommendation = () => {
@@ -198,10 +256,18 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
     try {
       const result = await onAutoScore(email);
       
+      // Check if rude language was detected
+      const toneScore = result.scores.find(s => s.criteriaId === 'tone');
+      if (toneScore && toneScore.score === 0) {
+        setContainsRudeLanguage(true);
+      } else {
+        setContainsRudeLanguage(false);
+      }
+      
       // If we have structure analysis, update the structure score in the AI results
       if (structureAnalysis) {
         const updatedScores = result.scores.map(score => 
-          score.criteriaId === 'structure' 
+          score.criteriaId === 'structure' && !containsRudeLanguage
             ? { 
                 ...score, 
                 score: structureAnalysis.score,
@@ -229,8 +295,8 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
     }
   };
 
-  // Calculate overall score as weighted average (all criteria have equal 25% weight)
-  const overallScore = Math.round(scores.reduce((total, score) => {
+  // Calculate overall score - if rude language detected, score is 0, otherwise weighted average
+  const overallScore = containsRudeLanguage ? 0 : Math.round(scores.reduce((total, score) => {
     return total + (score.score * 0.25); // Equal 25% weight for all criteria
   }, 0));
 
@@ -242,6 +308,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
             <span className="flex items-center gap-2">
               Quality Assessment
               {aiAssisted && <Badge variant="secondary" className="ml-2">AI Assisted</Badge>}
+              {containsRudeLanguage && <Badge variant="destructive" className="ml-2">Inappropriate Language</Badge>}
             </span>
             {email && email.agentName && (
               <div className="flex items-center mt-1 text-sm font-normal text-muted-foreground">
@@ -323,7 +390,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
               step={1}
               value={[scores.find(s => s.criteriaId === criteria.id)?.score || 0]}
               onValueChange={([value]) => handleScoreChange(criteria.id, value)}
-              disabled={disabled || isSubmitting}
+              disabled={disabled || isSubmitting || (containsRudeLanguage && criteria.id !== 'tone')}
             />
             <Textarea
               placeholder={`Feedback on ${criteria.name.toLowerCase()}`}

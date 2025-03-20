@@ -101,6 +101,7 @@ const Dashboard = () => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
+      className="w-full"
     >
       <section className="mb-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
@@ -307,7 +308,7 @@ const Dashboard = () => {
                         <span className={`font-semibold text-lg ${scoreColor}`}>
                           {Math.round(agentData.averageScore)}/10
                         </span>
-                        <ChevronRight className="ml-2 w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <ChevronRight className="ml-2 w-5 h-5 text-muted-foreground opacity-100 group-hover:opacity-100" />
                       </div>
                     </div>
                   );
