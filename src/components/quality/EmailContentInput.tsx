@@ -61,26 +61,30 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
       // Process the emailContent to ensure it's properly formatted
       onSubmit(emailContent, subject, agentName);
       
-      // Reset form
-      setEmailContent('');
-      setSubject('');
-      setDetectedImages([]);
-      if (imageContainerRef.current) {
-        imageContainerRef.current.innerHTML = '';
-      }
-      
-      toast({
-        title: "Email submitted",
-        description: "The email has been loaded for quality checking",
-        variant: "success"
-      });
+      // Reset form after successful submission
+      setTimeout(() => {
+        setEmailContent('');
+        setSubject('');
+        setAgentName('');
+        setDetectedImages([]);
+        if (imageContainerRef.current) {
+          imageContainerRef.current.innerHTML = '';
+        }
+        
+        toast({
+          title: "Email submitted",
+          description: "The email has been loaded for quality checking",
+          variant: "success"
+        });
+        setIsSubmitting(false);
+      }, 1000);
     } catch (error) {
+      console.error('Error submitting email:', error);
       toast({
         title: "Error",
         description: "An error occurred while submitting the email",
         variant: "destructive"
       });
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -357,7 +361,7 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading...
+                Processing...
               </>
             ) : (
               <>

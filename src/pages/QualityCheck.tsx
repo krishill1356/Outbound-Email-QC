@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -334,9 +333,11 @@ const QualityCheckPage = () => {
       createdAt: new Date().toISOString()
     };
 
+    // Set the selected email and explicitly trigger analysis
     setSelectedEmail(pastedEmail);
-    // Analyze the template and content automatically
-    // The useEffect will trigger the analysis
+    
+    // Directly trigger analysis rather than relying on the useEffect
+    await analyzeSelectedEmail(pastedEmail);
   };
 
   return (
