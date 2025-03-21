@@ -81,81 +81,131 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
     }
   };
   
-  // Handle paste with improved formatting preservation and image detection
+  // Improved paste handler with better format preservation
   const handlePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault(); // Prevent default to handle paste manually
+    e.preventDefault(); // Prevent default paste to handle it manually
     
-    // Get plain text 
+    // Extract both plain text and HTML content (if available)
     const plainText = e.clipboardData.getData('text/plain');
+    const htmlContent = e.clipboardData.getData('text/html');
     
-    // Get HTML content if available
-    let htmlContent = e.clipboardData.getData('text/html');
-    
-    // Detect any images in the pasted content
+    // Array to store detected images
     const newDetectedImages: string[] = [];
     
-    // Process HTML content if available
+    // Process the pasted content
     if (htmlContent && htmlContent.trim() !== '') {
       try {
         // Create a temporary DOM element to parse the HTML
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlContent, 'text/html');
         
-        // Find all image elements
+        // Extract images from HTML
         const images = doc.querySelectorAll('img');
         images.forEach(img => {
           if (img.src) {
-            // Check if it's a data URL or regular URL
             if (img.src.startsWith('data:image') || img.src.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) {
               newDetectedImages.push(img.src);
             }
           }
         });
 
-        // Find any references to image files in the text
-        const imgRegex = /\b\w+\.(png|jpg|jpeg|gif|webp|svg)\b/gi;
+        // Look for image references in the content
+        const imgRegex = /\b[\w-]+\.(png|jpg|jpeg|gif|webp|svg)\b/gi;
         const textContent = doc.body.textContent || '';
         const imgMatches = textContent.match(imgRegex) || [];
         
         imgMatches.forEach(match => {
-          newDetectedImages.push(`Image reference: ${match}`);
-        });
-        
-        // Set the content, preserving proper formatting
-        // Remove potentially unsafe scripts but keep formatting
-        const sanitizedNodes = Array.from(doc.body.childNodes);
-        let sanitizedHtml = '';
-        
-        sanitizedNodes.forEach(node => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            const element = node as Element;
-            if (element.tagName.toLowerCase() !== 'script') {
-              sanitizedHtml += element.outerHTML;
-            }
-          } else if (node.nodeType === Node.TEXT_NODE) {
-            sanitizedHtml += node.textContent;
+          // Prevent duplicates
+          if (!newDetectedImages.includes(`Image reference: ${match}`)) {
+            newDetectedImages.push(`Image reference: ${match}`);
           }
         });
         
-        // Set email content with sanitized HTML
-        setEmailContent(sanitizedHtml || plainText);
+        // Clean up and preserve formatting from HTML
+        let sanitizedContent = '';
+        
+        // Process each node to preserve formatting
+        const processNode = (node: Node): string => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            return node.textContent || '';
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const element = node as Element;
+            const tagName = element.tagName.toLowerCase();
+            
+            // Skip script tags
+            if (tagName === 'script') return '';
+            
+            // Handle specific formatting elements
+            if (tagName === 'br') return '\n';
+            if (tagName === 'p') {
+              let content = '';
+              Array.from(element.childNodes).forEach(child => {
+                content += processNode(child);
+              });
+              return content + '\n\n';
+            }
+            if (tagName === 'div') {
+              let content = '';
+              Array.from(element.childNodes).forEach(child => {
+                content += processNode(child);
+              });
+              return content + '\n';
+            }
+            if (tagName === 'li') {
+              let content = '';
+              Array.from(element.childNodes).forEach(child => {
+                content += processNode(child);
+              });
+              return '• ' + content + '\n';
+            }
+            
+            // Process other elements
+            let content = '';
+            Array.from(element.childNodes).forEach(child => {
+              content += processNode(child);
+            });
+            return content;
+          }
+          return '';
+        };
+        
+        // Process the body content
+        if (doc.body) {
+          Array.from(doc.body.childNodes).forEach(node => {
+            sanitizedContent += processNode(node);
+          });
+        }
+        
+        // Clean up extra newlines and whitespace
+        sanitizedContent = sanitizedContent
+          .replace(/\n{3,}/g, '\n\n') // Replace 3+ newlines with just 2
+          .replace(/^\s+|\s+$/g, ''); // Trim whitespace
+        
+        setEmailContent(sanitizedContent || plainText);
       } catch (error) {
-        console.error('Error parsing HTML content:', error);
-        setEmailContent(plainText); // Fallback to plain text
+        console.error('Error processing HTML content:', error);
+        // Fallback to plain text if HTML processing fails
+        const formattedText = plainText
+          .replace(/\r\n/g, '\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+        setEmailContent(formattedText);
       }
     } else {
-      // If no HTML is available, check for image references in plain text
-      const imgRegex = /\b\w+\.(png|jpg|jpeg|gif|webp|svg)\b/gi;
+      // If no HTML content is available, format the plain text
+      // Look for image references in plain text
+      const imgRegex = /\b[\w-]+\.(png|jpg|jpeg|gif|webp|svg)\b/gi;
       const imgMatches = plainText.match(imgRegex) || [];
       
       imgMatches.forEach(match => {
         newDetectedImages.push(`Image reference: ${match}`);
       });
       
-      // Format plain text with proper paragraph breaks
+      // Format plain text with proper line breaks
       const formattedText = plainText
-        .replace(/\n{3,}/g, '\n\n') // Replace multiple newlines with just two
-        .replace(/\r\n/g, '\n'); // Normalize line breaks
+        .replace(/\r\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
       
       setEmailContent(formattedText);
     }
