@@ -1,3 +1,4 @@
+
 import { QualityCheck } from '@/types';
 import { getQualityChecks as getStoredQualityChecks, saveQualityCheck as saveQC } from './storage/qualityCheckStorageService';
 import { analyzeEmailStructure } from './structural/emailStructureService';
@@ -60,4 +61,27 @@ export const runAutomatedQualityAnalysis = async (emailContent: string, subject:
     structuralAnalysis,
     // Other analysis results could be added here
   };
+};
+
+/**
+ * Delete quality checks for a specific agent
+ * This should be called when an agent is deleted
+ */
+export const deleteQualityChecksForAgent = (agentId: string): boolean => {
+  try {
+    const allChecks = getQualityChecks();
+    const filteredChecks = allChecks.filter(check => check.agentId !== agentId);
+    
+    // If any checks were removed
+    if (filteredChecks.length < allChecks.length) {
+      // Save the filtered list back
+      const result = saveQC({ type: 'bulk', checks: filteredChecks });
+      return result.success;
+    }
+    
+    return true; // No checks needed to be removed
+  } catch (error) {
+    console.error('Error deleting quality checks for agent:', error);
+    return false;
+  }
 };

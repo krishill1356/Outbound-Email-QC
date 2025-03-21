@@ -36,13 +36,13 @@ export const saveAgents = (agents: Agent[]): void => {
 export const addAgent = (agent: Omit<Partial<Agent>, 'id' | 'avatar'> & { name: string, department: string }): Agent => {
   const agents = getAgents();
   
-  // Create new agent with ID and avatar
+  // Create new agent with ID and deterministic avatar based on name
   const newAgent: Agent = {
     id: `agent-${Date.now()}`,
     name: agent.name,
     department: agent.department,
     email: agent.email || `${agent.name.toLowerCase().replace(/\s+/g, '.')}@example.com`, // Default email if not provided
-    avatar: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70)}`
+    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(agent.name)}&background=8B5CF6&color=fff`
   };
   
   // Save to localStorage
@@ -72,4 +72,26 @@ export const removeAgent = (agentId: string): boolean => {
 export const getAgent = (agentId: string): Agent | undefined => {
   const agents = getAgents();
   return agents.find(agent => agent.id === agentId);
+};
+
+/**
+ * Update an existing agent
+ */
+export const updateAgent = (agentId: string, updates: Partial<Omit<Agent, 'id'>>): Agent | undefined => {
+  const agents = getAgents();
+  const agentIndex = agents.findIndex(agent => agent.id === agentId);
+  
+  if (agentIndex !== -1) {
+    const updatedAgent = {
+      ...agents[agentIndex],
+      ...updates
+    };
+    
+    agents[agentIndex] = updatedAgent;
+    saveAgents(agents);
+    
+    return updatedAgent;
+  }
+  
+  return undefined;
 };
