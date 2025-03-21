@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -60,7 +61,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
   const [structureAnalysis, setStructureAnalysis] = useState<any>(null);
   const [agentsList, setAgentsList] = useState<Array<{id: string, name: string}>>([]);
   const [agentName, setAgentName] = useState('');
-  const [containsRudeLanguage, setContainsRudeLanguage] = useState(false);
+  const [containsExplicitLanguage, setContainsExplicitLanguage] = useState(false);
 
   // Load agents when component mounts
   useEffect(() => {
@@ -80,10 +81,10 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
       
       setAiAssisted(true);
       
-      // Check if rude language was detected (tone score = 0)
+      // Check if explicit language was detected (tone score = 0)
       const toneScore = initialData.scores.find(s => s.criteriaId === 'tone');
       if (toneScore && toneScore.score === 0) {
-        setContainsRudeLanguage(true);
+        setContainsExplicitLanguage(true);
       }
     }
   }, [initialData]);
@@ -124,40 +125,40 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
       setRecommendations(['']);
       setAiAssisted(false);
       setStructureAnalysis(null);
-      setContainsRudeLanguage(false);
+      setContainsExplicitLanguage(false);
     } else if (email?.agentName) {
       setAgentName(email.agentName);
     }
   }, [email]);
 
-  // Handle score change, but enforce 0 if rude language detected
+  // Handle score change, but enforce 0 if explicit language detected
   const handleScoreChange = (criteriaId: string, score: number) => {
-    // If it's the tone criteria being set to 0, this indicates rude language
+    // If it's the tone criteria being set to 0, this indicates explicit language
     if (criteriaId === 'tone' && score === 0) {
-      setContainsRudeLanguage(true);
+      setContainsExplicitLanguage(true);
       // Set all scores to 0
       setScores(prev => 
         prev.map(item => ({ 
           ...item, 
           score: 0,
           feedback: item.criteriaId === 'tone' ? 
-            item.feedback : "Inappropriate language detected, affecting all scores."
+            item.feedback : "Explicit language detected, affecting all scores."
         }))
       );
-    } else if (criteriaId === 'tone' && score > 0 && containsRudeLanguage) {
-      // If tone is being changed from 0 to something else, we're removing the rude language flag
-      setContainsRudeLanguage(false);
+    } else if (criteriaId === 'tone' && score > 0 && containsExplicitLanguage) {
+      // If tone is being changed from 0 to something else, we're removing the explicit language flag
+      setContainsExplicitLanguage(false);
       // Update just this score
       setScores(prev => 
         prev.map(item => 
           item.criteriaId === criteriaId ? { ...item, score: Math.round(score) } : item
         )
       );
-    } else if (containsRudeLanguage) {
-      // If rude language is detected, all scores must remain 0
+    } else if (containsExplicitLanguage) {
+      // If explicit language is detected, all scores must remain 0
       toast({
         title: "Cannot change score",
-        description: "Inappropriate language detected. All scores are set to 0.",
+        description: "Explicit language detected. All scores are set to 0.",
         variant: "destructive"
       });
     } else {
@@ -177,19 +178,17 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
       )
     );
     
-    // If this is tone feedback and contains indication of rude language, update state
+    // If this is tone feedback and contains indication of explicit language, update state
     if (criteriaId === 'tone' && 
-        (feedback.toLowerCase().includes('inappropriate') || 
-         feedback.toLowerCase().includes('rude') || 
-         feedback.toLowerCase().includes('profanity') || 
-         feedback.toLowerCase().includes('swearing'))) {
+        (feedback.toLowerCase().includes('swear') || 
+         feedback.toLowerCase().includes('explicit') || 
+         feedback.toLowerCase().includes('profanity'))) {
       
       const toneScore = scores.find(s => s.criteriaId === 'tone');
       if (toneScore && toneScore.score > 0) {
-        // Change from "warning" to "destructive" since "warning" is not a valid variant
         toast({
-          title: "Possible inappropriate language detected",
-          description: "Consider setting tone score to 0 if the email contains inappropriate language.",
+          title: "Possible explicit language detected",
+          description: "Consider setting tone score to 0 if the email contains explicit language.",
           variant: "destructive"
         });
       }
@@ -256,18 +255,18 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
     try {
       const result = await onAutoScore(email);
       
-      // Check if rude language was detected
+      // Check if explicit language was detected
       const toneScore = result.scores.find(s => s.criteriaId === 'tone');
       if (toneScore && toneScore.score === 0) {
-        setContainsRudeLanguage(true);
+        setContainsExplicitLanguage(true);
       } else {
-        setContainsRudeLanguage(false);
+        setContainsExplicitLanguage(false);
       }
       
       // If we have structure analysis, update the structure score in the AI results
       if (structureAnalysis) {
         const updatedScores = result.scores.map(score => 
-          score.criteriaId === 'structure' && !containsRudeLanguage
+          score.criteriaId === 'structure' && !containsExplicitLanguage
             ? { 
                 ...score, 
                 score: structureAnalysis.score,
@@ -295,8 +294,8 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
     }
   };
 
-  // Calculate overall score - if rude language detected, score is 0, otherwise weighted average
-  const overallScore = containsRudeLanguage ? 0 : Math.round(scores.reduce((total, score) => {
+  // Calculate overall score - if explicit language detected, score is 0, otherwise weighted average
+  const overallScore = containsExplicitLanguage ? 0 : Math.round(scores.reduce((total, score) => {
     return total + (score.score * 0.25); // Equal 25% weight for all criteria
   }, 0));
 
@@ -308,7 +307,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
             <span className="flex items-center gap-2">
               Quality Assessment
               {aiAssisted && <Badge variant="secondary" className="ml-2">AI Assisted</Badge>}
-              {containsRudeLanguage && <Badge variant="destructive" className="ml-2">Inappropriate Language</Badge>}
+              {containsExplicitLanguage && <Badge variant="destructive" className="ml-2">Explicit Language</Badge>}
             </span>
             {email && email.agentName && (
               <div className="flex items-center mt-1 text-sm font-normal text-muted-foreground">
@@ -394,7 +393,7 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
                 step={1}
                 value={[scoreItem?.score || 0]}
                 onValueChange={([value]) => handleScoreChange(criteria.id, value)}
-                disabled={disabled || isSubmitting || (containsRudeLanguage && criteria.id !== 'tone')}
+                disabled={disabled || isSubmitting || (containsExplicitLanguage && criteria.id !== 'tone')}
               />
               
               {/* Display score breakdown if available */}

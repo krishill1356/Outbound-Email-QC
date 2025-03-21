@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ZammadEmail } from '@/services/zammadService';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, User } from 'lucide-react';
+import { AlertCircle, User, Image } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
 interface QCEmailViewerProps {
@@ -30,9 +30,49 @@ const QCEmailViewer: React.FC<QCEmailViewerProps> = ({ email, templateAnalysis }
     );
   }
 
-  // Function to sanitize HTML (in a real app you'd want to use a library like DOMPurify)
+  // Function to sanitize HTML and look for image references
   const createMarkup = () => {
-    return { __html: email.body };
+    // Check for image file references that might have been missed
+    const imgRegex = /\b\w+\.(png|jpg|jpeg|gif|webp|svg)\b/gi;
+    let processedBody = email.body;
+    const imgMatches = email.body.match(imgRegex) || [];
+    
+    // Highlight image references in the content
+    if (imgMatches.length > 0) {
+      // Create a set to avoid duplicates
+      const uniqueMatches = [...new Set(imgMatches)];
+      
+      uniqueMatches.forEach(match => {
+        // Don't replace inside HTML tags (to avoid breaking img src attributes)
+        // This regex matches the pattern but checks it's not inside an HTML attribute
+        const safeRegex = new RegExp(`(?<!src=["'][^"']*?)\\b${match}\\b`, 'gi');
+        processedBody = processedBody.replace(
+          safeRegex, 
+          `<span class="inline-flex items-center bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-1 py-0.5 rounded text-xs font-medium">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            ${match}
+          </span>`
+        );
+      });
+    }
+    
+    return { __html: processedBody };
+  };
+
+  // Check if email body contains image references
+  const containsImageReferences = () => {
+    const imgRegex = /\b\w+\.(png|jpg|jpeg|gif|webp|svg)\b/gi;
+    return (email.body.match(imgRegex) || []).length > 0;
+  };
+
+  // Count image references in the email
+  const countImageReferences = () => {
+    const imgRegex = /\b\w+\.(png|jpg|jpeg|gif|webp|svg)\b/gi;
+    const matches = email.body.match(imgRegex) || [];
+    // Use a set to get unique image names
+    return new Set(matches).size;
   };
 
   return (
@@ -44,6 +84,12 @@ const QCEmailViewer: React.FC<QCEmailViewerProps> = ({ email, templateAnalysis }
             {templateAnalysis?.detectedTemplate && (
               <Badge variant="outline" className="ml-2">
                 {templateAnalysis.detectedTemplate}
+              </Badge>
+            )}
+            {containsImageReferences() && (
+              <Badge variant="secondary" className="ml-2 flex items-center gap-1">
+                <Image className="h-3 w-3" />
+                {countImageReferences()} image(s)
               </Badge>
             )}
           </div>
@@ -98,8 +144,8 @@ const QCEmailViewer: React.FC<QCEmailViewerProps> = ({ email, templateAnalysis }
           </div>
         )}
         
-        <ScrollArea className="border rounded-lg p-4 h-[400px] bg-white">
-          <div className="prose max-w-none">
+        <ScrollArea className="border rounded-lg p-4 h-[400px] bg-white dark:bg-gray-800">
+          <div className="prose dark:prose-invert max-w-none">
             <div 
               dangerouslySetInnerHTML={createMarkup()} 
               className="email-content" 

@@ -9,16 +9,19 @@
 export function analyzeTone(content: string) {
   const professionalKeywords = ['sincerely', 'regards', 'thank you', 'please', 'appreciate', 'respectfully', 'professionally'];
   const politeKeywords = ['hello', 'hi', 'dear', 'good morning', 'good afternoon', 'good evening', 'greetings'];
-  const rudeLanguage = ['stupid', 'idiot', 'useless', 'incompetent', 'damn', 'crap', 'shit', 'fuck', 'ass', 'bitch', 'hell'];
+  // Updated explicit swear words list (these are the only words that should trigger zero score)
+  const explicitSwearWords = ['fuck', 'shit', 'cunt', 'bollocks', 'bastard', 'twat', 'asshole', 'bitch'];
   const forcefulLanguage = ['must', 'immediately', 'urgent', 'asap', 'demand', 'require'];
   const empathyKeywords = ['understand', 'appreciate', 'sorry', 'empathize', 'perspective', 'situation', 'aware'];
   
-  // Check for rude language or swearing
-  for (const word of rudeLanguage) {
-    if (content.toLowerCase().includes(word)) {
+  // Check for explicit swear words only - these are the only words that should trigger zero score
+  for (const word of explicitSwearWords) {
+    // Use word boundary to match whole words only
+    const regex = new RegExp(`\\b${word}\\b`, 'i');
+    if (regex.test(content.toLowerCase())) {
       return {
         score: 0,
-        feedback: 'The email contains inappropriate or rude language. This type of language should be avoided in professional communication.',
+        feedback: 'The email contains explicit language (swearing). This type of language is not acceptable in professional communication.',
         toneBreakdown: {
           professionalism: 0,
           politeness: 0,
