@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
   const [agentsList, setAgentsList] = useState<Array<{id: string, name: string}>>(
     getAgents().map(agent => ({ id: agent.id, name: agent.name }))
   );
+  const imageContainerRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,13 +59,15 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
     
     try {
       // Process the emailContent to ensure it's properly formatted
-      // This will preserve any detected images and send the final content
       onSubmit(emailContent, subject, agentName);
       
       // Reset form
       setEmailContent('');
       setSubject('');
       setDetectedImages([]);
+      if (imageContainerRef.current) {
+        imageContainerRef.current.innerHTML = '';
+      }
       
       toast({
         title: "Email submitted",
@@ -81,7 +85,7 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
     }
   };
   
-  // Improved paste handler with better format preservation
+  // Handle direct paste to the textarea
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault(); // Prevent default paste to handle it manually
     
@@ -105,6 +109,15 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
           if (img.src) {
             if (img.src.startsWith('data:image') || img.src.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) {
               newDetectedImages.push(img.src);
+              
+              // Create an image element to display the pasted image
+              if (imageContainerRef.current) {
+                const imgElement = document.createElement('img');
+                imgElement.src = img.src;
+                imgElement.className = 'max-h-40 max-w-full rounded-md mt-2 mb-2';
+                imgElement.alt = 'Pasted image';
+                imageContainerRef.current.appendChild(imgElement);
+              }
             }
           }
         });
@@ -158,6 +171,9 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
               });
               return '• ' + content + '\n';
             }
+            if (tagName === 'img') {
+              return '[IMAGE]\n';
+            }
             
             // Process other elements
             let content = '';
@@ -209,15 +225,50 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
       
       setEmailContent(formattedText);
     }
+
+    // Handle pasted image files directly
+    if (e.clipboardData.items) {
+      for (let i = 0; i < e.clipboardData.items.length; i++) {
+        const item = e.clipboardData.items[i];
+        
+        if (item.type.indexOf('image') !== -1) {
+          const blob = item.getAsFile();
+          if (blob) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              if (event.target && event.target.result) {
+                const imageUrl = event.target.result.toString();
+                
+                // Add to detected images list
+                newDetectedImages.push(imageUrl);
+                
+                // Create an image element to display the pasted image
+                if (imageContainerRef.current) {
+                  const imgElement = document.createElement('img');
+                  imgElement.src = imageUrl;
+                  imgElement.className = 'max-h-40 max-w-full rounded-md mt-2 mb-2';
+                  imgElement.alt = 'Pasted image';
+                  imageContainerRef.current.appendChild(imgElement);
+                }
+              }
+            };
+            reader.readAsDataURL(blob);
+          }
+        }
+      }
+    }
     
     // Update detected images
     if (newDetectedImages.length > 0) {
-      setDetectedImages(newDetectedImages);
+      setDetectedImages(prevImages => {
+        const combinedImages = [...prevImages, ...newDetectedImages];
+        return [...new Set(combinedImages)]; // Remove duplicates
+      });
       
       toast({
         title: `${newDetectedImages.length} image(s) detected`,
-        description: "References to images found in the pasted content",
-        variant: "default" // Changed from "info" to "default"
+        description: "Images found in the pasted content",
+        variant: "default"
       });
     }
   };
@@ -271,9 +322,12 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
               onPaste={handlePaste}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Paste the email content here. Formatting and image references will be preserved.
+              Paste the email content here. Formatting, images, and attachments will be preserved.
             </p>
           </div>
+          
+          {/* Display pasted images here */}
+          <div ref={imageContainerRef} className="flex flex-wrap gap-2"></div>
           
           {detectedImages.length > 0 && (
             <div className="rounded-md bg-muted p-3">
