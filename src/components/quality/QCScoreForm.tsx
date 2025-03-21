@@ -432,7 +432,11 @@ const QCScoreForm: React.FC<QCScoreFormProps> = ({
               {Object.entries((initialData as any).contentStats).map(([key, value]) => (
                 <div key={key} className="flex justify-between">
                   <span className="text-sm capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
-                  <span className="text-sm font-medium">{typeof value === 'number' && value % 1 !== 0 ? (value as number).toFixed(1) : value}</span>
+                  <span className="text-sm font-medium">
+                    {typeof value === 'number' && value % 1 !== 0 
+                      ? (value as number).toFixed(1) 
+                      : String(value)}
+                  </span>
                 </div>
               ))}
             </div>

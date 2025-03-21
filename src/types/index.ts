@@ -1,3 +1,4 @@
+
 export interface ZammadSettings {
   apiUrl: string;
   apiToken: string;
@@ -45,4 +46,64 @@ export interface ScoreResult {
   breakdown?: {
     [key: string]: number;
   };
+}
+
+// Add missing types that are referenced in the codebase
+export interface QualityCriteria {
+  id: string;
+  name: string;
+  description: string;
+  weight: number;
+}
+
+export interface Agent {
+  id: string;
+  name: string;
+  email: string;
+  department: string;
+  avatar: string;
+}
+
+export interface Template {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+  tags: string[];
+}
+
+export interface PerformanceData {
+  overall: {
+    date: string;
+    average: number;
+  }[];
+  agents: AgentPerformance[];
+}
+
+export interface AgentPerformance {
+  agent?: Agent;
+  trend: {
+    date: string;
+    score: number;
+  }[];
+  averageScore: number;
+  checksCount: number;
+  criteriaBreakdown: {
+    criteriaId: string;
+    name: string;
+    average: number;
+  }[];
+}
+
+export interface ScoreBreakdown {
+  [key: string]: number;
+}
+
+// Add missing types that might be used in QCScoreForm.tsx
+export interface ContentStats {
+  wordCount: number;
+  sentenceCount: number;
+  paragraphCount: number;
+  averageSentenceLength: number;
+  readingTime: number;
 }
