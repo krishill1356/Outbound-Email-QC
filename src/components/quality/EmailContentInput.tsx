@@ -167,7 +167,7 @@ const EmailContentInput: React.FC<EmailContentInputProps> = ({ onSubmit }) => {
       toast({
         title: `${newDetectedImages.length} image(s) detected`,
         description: "References to images found in the pasted content",
-        variant: "info"
+        variant: "default" // Changed from "info" to "default"
       });
     }
   };
